@@ -202,9 +202,19 @@
                 <button onclick="switchTab('search')" id="btn-search" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all text-left">Cari & Histori</button>
             </nav>
 
-            <div class="p-4 border-t border-slate-100">
+            <div class="p-4 border-t border-slate-100 space-y-2">
                 <div id="user-info" class="text-[10px] text-slate-400 mb-2 truncate">Memulai Sesi...</div>
+                
+                <!-- Hidden Input for CSV -->
+                <input type="file" id="csv-import-input" accept=".csv" class="hidden" onchange="handleCSVImport(event)">
+                
+                <button onclick="document.getElementById('csv-import-input').click()" class="w-full flex items-center justify-center gap-2 bg-sky-50 text-sky-700 py-2 rounded-lg text-sm font-bold border border-sky-100 hover:bg-sky-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span>Import Data (CSV)</span>
+                </button>
+
                 <button onclick="exportToCSV()" class="w-full flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-2 rounded-lg text-sm font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     <span>Export Database (CSV)</span>
                 </button>
             </div>
@@ -521,17 +531,17 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc, updateDoc, deleteDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- CONFIG & GLOBAL STATE ---
         const firebaseConfig = {
-  apiKey: "AIzaSyAzlAn3taV7-WMDta-AQAewzDUaZzxvxAc",
-  authDomain: "inventarisnonalkes.firebaseapp.com",
-  projectId: "inventarisnonalkes",
-  storageBucket: "inventarisnonalkes.firebasestorage.app",
-  messagingSenderId: "212207980203",
-  appId: "1:212207980203:web:582396a405766aa21ab1ee"
-};
+            apiKey: "AIzaSyAzlAn3taV7-WMDta-AQAewzDUaZzxvxAc",
+            authDomain: "inventarisnonalkes.firebaseapp.com",
+            projectId: "inventarisnonalkes",
+            storageBucket: "inventarisnonalkes.firebasestorage.app",
+            messagingSenderId: "212207980203",
+            appId: "1:212207980203:web:582396a405766aa21ab1ee"
+        };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -1054,12 +1064,69 @@
             }
         };
 
+        // --- CSV IMPORT/EXPORT ---
         window.exportToCSV = () => {
             let csv = "ID,Nama,Merk,SN,Lokasi,Harga,Vendor,Tanggal Beli,Kondisi\n";
             assets.forEach(a => { csv += `"${a.id}","${a.nama}","${a.merk}","${a.sn || ''}","${a.lokasi}","${a.harga}","${a.vendor || ''}","${a.tgl_beli || ''}","${a.kondisi}"\n`; });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-            link.download = 'inventaris_rsdk.csv'; link.click();
+            link.download = `inventaris_rsdk_${new Date().toISOString().split('T')[0]}.csv`; 
+            link.click();
+        };
+
+        window.handleCSVImport = async (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                if (lines.length <= 1) return;
+
+                const batch = writeBatch(db);
+                const assetsRef = collection(db, 'artifacts', appId, 'public', 'data', 'assets');
+                let count = 0;
+
+                // Simple CSV Parser (Skip header)
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+
+                    // Regex to handle quoted strings in CSV
+                    const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                    if (!parts || parts.length < 8) continue;
+
+                    const clean = (str) => str ? str.replace(/^"|"$/g, '') : '';
+
+                    const data = {
+                        nama: clean(parts[1]),
+                        merk: clean(parts[2]),
+                        sn: clean(parts[3]),
+                        lokasi: clean(parts[4]),
+                        harga: parseFloat(clean(parts[5])) || 0,
+                        vendor: clean(parts[6]),
+                        tgl_beli: clean(parts[7]),
+                        kondisi: clean(parts[8]) || 'Tersedia',
+                        foto: null // CSV import doesn't support images
+                    };
+
+                    const newDoc = doc(assetsRef);
+                    batch.set(newDoc, data);
+                    count++;
+                }
+
+                if (count > 0) {
+                    try {
+                        await batch.commit();
+                        showNotification(`${count} data aset berhasil diimport!`);
+                    } catch (err) {
+                        showNotification("Gagal import data massal", "error");
+                    }
+                }
+                event.target.value = ""; // Reset input
+            };
+            reader.readAsText(file);
         };
 
         window.openMutationEditModal = (id) => {
