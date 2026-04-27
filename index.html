@@ -163,7 +163,7 @@
     <div id="loading-overlay">
         <div class="w-12 h-12 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-4"></div>
         <p class="font-bold text-slate-700">Inisialisasi Keamanan Cloud...</p>
-        <p id="loading-subtext" class="text-xs text-slate-400 mt-2">Mohon tunggu sebentar, mas tomo lagi pusing</p>
+        <p id="loading-subtext" class="text-xs text-slate-400 mt-2">Mohon tunggu sebentar, sinkronisasi data sedang berjalan</p>
     </div>
 
     <div id="toast" class="notification bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
@@ -174,7 +174,7 @@
 
     <div class="running-text-container border-b border-sky-900 no-print">
         <div class="running-text">
-            Selamat Datang di SISTEM INVENTARIS NON ALKES RSU DADI KELUARGA (CLOUD SYNC) • Pelacakan Aset Terintegrasi • Status Cloud: <span id="cloud-status" class="text-emerald-400">Menghubungkan...</span> • Update Terakhir: <span id="current-time"></span>
+            Selamat Datang di SISTEM INVENTARIS NON ALKES RSU DADI KELUARGA (CLOUD SYNC) • Pelacakan Aset Terintegrasi • Status Cloud: <span id="cloud-status" class="text-emerald-400">Menghubungkan...</span> • Update Terakhir: <span id="current-time-display"></span>
         </div>
     </div>
 
@@ -363,7 +363,8 @@
                             <p class="text-[10px]">NIP. .........................</p>
                         </div>
                         <div class="text-center">
-                            <p class="text-sm mb-1 text-right italic">Dicetak pada: <span class="print-date"></span></p>
+                            <!-- Tanggal Cetak Muncul Disini -->
+                            <p class="text-sm mb-1 text-right italic">Dicetak pada: <span id="print-date-field" class="font-bold"></span></p>
                             <p class="text-sm mb-20">Pencatat Barang / RT</p>
                             <p class="text-sm font-bold border-b border-black inline-block px-8">( ____________________ )</p>
                             <p class="text-[10px]">NIP. .........................</p>
@@ -562,6 +563,14 @@
         let currentPhoto = null;
         let isInitialLoad = true;
 
+        // Update Running Text Time
+        setInterval(() => {
+            const now = new Date();
+            const timeStr = now.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+            const display = document.getElementById('current-time-display');
+            if(display) display.innerText = timeStr;
+        }, 1000);
+
         // --- AUTH ---
         const initAuth = async () => {
             try {
@@ -605,20 +614,20 @@
                 renderDatabase();
                 updateMutateItemDropdown();
                 if (isInitialLoad) { isInitialLoad = false; hideLoading(); }
-            });
+            }, (err) => console.error(err));
 
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), (snap) => {
                 mutations = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 mutations.sort((a,b) => new Date(b.time) - new Date(a.time));
                 renderDashboard();
                 renderMutationDatabase();
-            });
+            }, (err) => console.error(err));
 
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), (snap) => {
                 rooms = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderRooms();
                 populateRoomDropdowns();
-            });
+            }, (err) => console.error(err));
         }
 
         // --- CORE FUNCTIONS ---
@@ -672,23 +681,17 @@
             });
         }
 
-        // --- UPDATE MUTATE DROPDOWN (NEW REQUIREMENT) ---
         function updateMutateItemDropdown() {
             const dd = document.getElementById('mutate-item');
             if (!dd) return;
             const currentVal = dd.value;
             dd.innerHTML = '<option value="">Pilih Aset...</option>';
-            
-            // Sort by name
             const sortedAssets = [...assets].sort((a, b) => a.nama.localeCompare(b.nama));
-            
             sortedAssets.forEach(a => {
                 const snText = a.sn ? a.sn : "Tanpa SN";
-                // Show: Nama Barang - SN - Lokasi Asal
                 const label = `${a.nama} (SN: ${snText}) - [${a.lokasi}]`;
                 dd.innerHTML += `<option value="${a.id}">${label}</option>`;
             });
-            
             if(currentVal) dd.value = currentVal;
         }
 
@@ -699,7 +702,7 @@
             
             document.getElementById('recent-assets').innerHTML = [...assets].sort((a,b) => b.id.localeCompare(a.id)).slice(0,3).map(a=>`
                 <div class="p-4 bg-white border rounded-xl flex justify-between items-center shadow-sm">
-                    <div><p class="font-bold text-slate-700">${a.nama}</p><p class="text-[9px] text-slate-400 font-mono">${a.sn || 'No SN'}</p></div>
+                    <div><p class="font-bold text-slate-700 text-xs">${a.nama}</p><p class="text-[9px] text-slate-400 font-mono">${a.sn || 'No SN'}</p></div>
                     <span class="text-[9px] bg-sky-50 text-sky-600 px-3 py-1 rounded-full font-bold uppercase">${a.lokasi}</span>
                 </div>
             `).join('') || '<p class="text-center text-slate-400 text-xs py-10 bg-white rounded-xl border border-dashed">Belum ada aset</p>';
@@ -710,7 +713,7 @@
                         <p class="text-xs font-bold text-slate-700 truncate">${m.assetName}</p>
                         <p class="text-[9px] text-amber-600 font-bold uppercase">${m.fromLoc} → ${m.toLoc}</p>
                     </div>
-                    <p class="text-[8px] text-slate-400 italic shrink-0">${new Date(m.time).toLocaleDateString()}</p>
+                    <p class="text-[8px] text-slate-400 italic shrink-0">${new Date(m.time).toLocaleDateString('id-ID')}</p>
                 </div>
             `).join('') || '<p class="text-center text-slate-400 text-xs py-10 bg-white rounded-xl border border-dashed">Belum ada mutasi</p>';
         }
@@ -734,14 +737,15 @@
                 if(editId) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', editId), data);
                 else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), data);
                 
-                showNotification("Data Cloud Tersimpan");
+                showNotification("Data Berhasil Disimpan");
                 document.getElementById('assetForm').reset();
                 document.getElementById('image-display').classList.add('hidden');
                 document.getElementById('photo-placeholder').classList.remove('hidden');
                 currentPhoto = null;
                 document.getElementById('edit-id').value = "";
+                document.getElementById('input-title').innerText = "Input Aset Baru";
                 switchTab('database');
-            } catch (err) { showNotification("Gagal", "error"); }
+            } catch (err) { showNotification("Gagal menyimpan data", "error"); }
         };
 
         window.editAsset = (id) => {
@@ -767,7 +771,7 @@
         };
 
         window.deleteAsset = async (id) => {
-            if(confirm('Hapus dari cloud?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
+            if(confirm('Hapus aset ini secara permanen dari Cloud?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
         };
 
         function renderDatabase() {
@@ -816,14 +820,14 @@
                 showNotification("Mutasi Berhasil");
                 document.getElementById('mutationForm').reset();
                 switchTab('mutation-db');
-            } catch (err) { showNotification("Gagal", "error"); }
+            } catch (err) { showNotification("Gagal melakukan mutasi", "error"); }
         };
 
         function renderMutationDatabase() {
             const body = document.getElementById('mutation-db-body');
             body.innerHTML = mutations.map(m => `
                 <tr class="text-[10px] hover:bg-slate-50">
-                    <td class="px-6 py-4 font-mono">${new Date(m.time).toLocaleString()}</td>
+                    <td class="px-6 py-4 font-mono">${new Date(m.time).toLocaleString('id-ID')}</td>
                     <td class="px-6 py-4 font-bold text-slate-800">${m.assetName}</td>
                     <td class="px-6 py-4">${m.fromLoc} → ${m.toLoc}</td>
                     <td class="px-6 py-4 font-bold uppercase text-sky-600">${m.status}</td>
@@ -864,7 +868,7 @@
             const assetMuts = mutations.filter(m => m.assetName === a.nama);
             document.getElementById('hist-mutation-list').innerHTML = assetMuts.map(m => `
                 <div class="bg-white border rounded-lg p-3 text-[10px]">
-                    <p class="font-bold">${m.fromLoc} → ${m.toLoc} (${new Date(m.time).toLocaleDateString()})</p>
+                    <p class="font-bold">${m.fromLoc} → ${m.toLoc} (${new Date(m.time).toLocaleDateString('id-ID')})</p>
                     <p class="text-sky-600 uppercase font-bold">${m.status}</p>
                     <p class="italic text-slate-400">${m.note || '-'}</p>
                 </div>
@@ -893,18 +897,21 @@
             const name = document.getElementById('roomNameInput').value.trim();
             const id = document.getElementById('room-edit-id').value;
             if(!name) return;
-            if(id) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), { name });
-            else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name });
-            document.getElementById('roomModal').style.display = 'none';
+            try {
+                if(id) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id), { name });
+                else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name });
+                document.getElementById('roomModal').style.display = 'none';
+                showNotification("Ruangan Tersimpan");
+            } catch(e) { showNotification("Gagal simpan ruangan", "error"); }
         };
 
         window.deleteRoom = async (id) => {
-            if(confirm('Hapus?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
+            if(confirm('Hapus ruangan ini? Aset di dalamnya tidak akan terhapus namun lokasinya tetap terdaftar di ruangan lama.')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
         };
 
         function renderRooms() {
             document.getElementById('rooms-table-body').innerHTML = rooms.map(r => `
-                <tr class="text-sm"><td class="px-6 py-4 font-bold">${r.name}</td>
+                <tr class="text-sm"><td class="px-6 py-4 font-bold text-slate-700">${r.name}</td>
                 <td class="px-6 py-4 text-right">
                 <button onclick="openRoomModal('${r.id}')" class="text-sky-600 font-bold mr-4">Ubah</button>
                 <button onclick="deleteRoom('${r.id}')" class="text-rose-400 font-bold">Hapus</button></td></tr>
@@ -930,7 +937,27 @@
             `).join('');
         };
 
-        window.printCurrentView = () => { if(document.getElementById('filter-room-select').value) window.print(); };
+        // NEW: Print Function with dynamic date
+        window.printCurrentView = () => { 
+            const roomName = document.getElementById('filter-room-select').value;
+            if(!roomName) {
+                showNotification("Pilih ruangan terlebih dahulu", "error");
+                return;
+            }
+            
+            // Set dynamic date for print footer
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('id-ID', { 
+                day: '2-digit', 
+                month: 'long', 
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('print-date-field').innerText = dateStr;
+            
+            window.print(); 
+        };
 
         // --- IMPORT / EXPORT ---
         window.exportToCSV = () => {
@@ -959,7 +986,7 @@
                         harga: parseFloat(cl(p[4]))||0, vendor: cl(p[5]), tgl_beli: cl(p[6]), kondisi: cl(p[7])
                     });
                 }
-                await batch.commit(); showNotification("Import Selesai");
+                await batch.commit(); showNotification("Import Data Selesai");
             };
             reader.readAsText(file);
         };
@@ -973,7 +1000,7 @@
             document.getElementById('image-display').src = currentPhoto;
             document.getElementById('image-display').classList.remove('hidden');
             document.getElementById('photo-placeholder').classList.add('hidden');
-            document.getElementById('compression-status').innerText = "Selesai!";
+            document.getElementById('compression-status').innerText = "Berhasil dikompresi!";
         };
 
         window.closePhotoModal = () => document.getElementById('photoModal').style.display = 'none';
@@ -993,14 +1020,16 @@
 
         window.saveMutationEdit = async () => {
             const id = document.getElementById('edit-mutation-id').value;
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id), {
-                status: document.getElementById('edit-mutation-status').value,
-                note: document.getElementById('edit-mutation-note').value
-            });
-            closeMutationEditModal(); showNotification("Log Diperbarui");
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id), {
+                    status: document.getElementById('edit-mutation-status').value,
+                    note: document.getElementById('edit-mutation-note').value
+                });
+                closeMutationEditModal(); showNotification("Log Mutasi Diperbarui");
+            } catch(e) { showNotification("Gagal edit log", "error"); }
         };
 
-        window.deleteMutation = async (id) => { if(confirm('Hapus log?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id)); };
+        window.deleteMutation = async (id) => { if(confirm('Hapus log mutasi ini? Ini tidak membatalkan posisi aset saat ini.')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id)); };
 
     </script>
 </body>
