@@ -148,20 +148,22 @@
         #loading-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.9);
             z-index: 3000;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            transition: opacity 0.5s ease;
         }
     </style>
 </head>
 <body class="min-h-screen">
 
-    <div id="loading-overlay" class="hidden">
+    <div id="loading-overlay">
         <div class="w-12 h-12 border-4 border-sky-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="font-bold text-slate-700">Sinkronisasi Cloud...</p>
+        <p class="font-bold text-slate-700">Menghubungkan ke Cloud...</p>
+        <p class="text-xs text-slate-400 mt-2">Mohon tunggu sebentar</p>
     </div>
 
     <div id="toast" class="notification bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3">
@@ -172,7 +174,7 @@
 
     <div class="running-text-container border-b border-sky-900 no-print">
         <div class="running-text">
-            Selamat Datang di SISTEM INVENTARIS RSU DADI KELUARGA (CLOUD SYNC) • Pelacakan Aset Terintegrasi • Status Cloud: <span id="cloud-status" class="text-emerald-400">Terhubung</span> • Update Terakhir: <span id="current-time"></span>
+            Selamat Datang di SISTEM INVENTARIS RSU DADI KELUARGA (CLOUD SYNC) • Pelacakan Aset Terintegrasi • Status Cloud: <span id="cloud-status" class="text-emerald-400">Menghubungkan...</span> • Update Terakhir: <span id="current-time"></span>
         </div>
     </div>
 
@@ -201,7 +203,7 @@
             </nav>
 
             <div class="p-4 border-t border-slate-100">
-                <div id="user-info" class="text-[10px] text-slate-400 mb-2 truncate">Memuat User...</div>
+                <div id="user-info" class="text-[10px] text-slate-400 mb-2 truncate">Memulai Sesi...</div>
                 <button onclick="exportToCSV()" class="w-full flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 py-2 rounded-lg text-sm font-bold border border-emerald-100 hover:bg-emerald-100 transition-colors">
                     <span>Export Database (CSV)</span>
                 </button>
@@ -509,16 +511,20 @@
   messagingSenderId: "212207980203",
   appId: "1:212207980203:web:582396a405766aa21ab1ee"
 };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         let user = null;
         let assets = [];
         let mutations = [];
         let rooms = [];
         let currentPhoto = null;
+        let isInitialLoad = true;
 
         // --- AUTH INITIALIZATION ---
         const initAuth = async () => {
-            document.getElementById('loading-overlay').classList.remove('hidden');
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
@@ -527,6 +533,7 @@
                 }
             } catch (error) {
                 console.error("Auth error:", error);
+                hideLoading();
                 showNotification("Gagal terhubung ke Cloud", "error");
             }
         };
@@ -534,20 +541,37 @@
         onAuthStateChanged(auth, (u) => {
             user = u;
             if (user) {
-                document.getElementById('user-info').innerText = `Cloud ID: ${user.uid}`;
+                document.getElementById('user-info').innerText = `ID Sesi Cloud: ${user.uid.substring(0, 8)}...`;
                 document.getElementById('cloud-status').innerText = "Terhubung";
+                document.getElementById('cloud-status').className = "text-emerald-400";
                 setupListeners();
             } else {
-                document.getElementById('cloud-status').innerText = "Offline";
+                document.getElementById('cloud-status').innerText = "Terputus";
                 document.getElementById('cloud-status').className = "text-rose-400";
             }
         });
 
         initAuth();
 
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 500);
+            }
+        }
+
         // --- FIRESTORE LISTENERS ---
         function setupListeners() {
             if (!user) return;
+
+            // Timeout safety - hide loading even if collection is empty
+            setTimeout(() => {
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+                    hideLoading();
+                }
+            }, 5000);
 
             // Assets Listener
             const assetsRef = collection(db, 'artifacts', appId, 'public', 'data', 'assets');
@@ -557,8 +581,15 @@
                 renderDatabase();
                 renderRoomAssetList();
                 updateMutateItemDropdown();
-                document.getElementById('loading-overlay').classList.add('hidden');
-            }, (err) => showNotification("Gagal memuat Aset", "error"));
+                
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+                    hideLoading();
+                }
+            }, (err) => {
+                console.error("Asset listener error:", err);
+                hideLoading();
+            });
 
             // Mutations Listener
             const mutationsRef = collection(db, 'artifacts', appId, 'public', 'data', 'mutations');
@@ -573,15 +604,16 @@
             const roomsRef = collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
             onSnapshot(roomsRef, (snapshot) => {
                 rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (rooms.length === 0) {
-                    // Seed initial rooms if empty
-                    ["IGD", "Radiologi", "Laboratorium", "ICU", "Poliklinik", "Administrasi"].forEach(r => {
-                        addDoc(roomsRef, { name: r });
+                if (rooms.length === 0 && user) {
+                    // Seed initial rooms only if truly empty
+                    const initial = ["IGD", "Radiologi", "Laboratorium", "ICU", "Poliklinik", "Administrasi"];
+                    initial.forEach(async (r) => {
+                        await addDoc(roomsRef, { name: r });
                     });
                 }
                 renderRooms();
                 populateRoomDropdowns();
-            });
+            }, (err) => console.error("Room listener error:", err));
         }
 
         // --- UTILITIES ---
@@ -606,9 +638,12 @@
         // --- TAB NAVIGATION ---
         window.switchTab = (tabId) => {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const target = document.getElementById('tab-' + tabId);
+            if (target) target.classList.remove('hidden');
+            
             document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('sidebar-active'));
-            document.getElementById('btn-' + tabId).classList.add('sidebar-active');
+            const btn = document.getElementById('btn-' + tabId);
+            if (btn) btn.classList.add('sidebar-active');
 
             if(tabId === 'dashboard') renderDashboard();
             if(tabId === 'database') renderDatabase();
@@ -626,24 +661,24 @@
             
             document.getElementById('recent-assets').innerHTML = [...assets].sort((a,b) => b.id.localeCompare(a.id)).slice(0,3).map(a=>`
                 <div class="p-3 bg-white border border-slate-100 rounded-xl flex justify-between items-center">
-                    <span>${a.nama}</span>
-                    <span class="text-[10px] text-slate-400">${a.lokasi}</span>
+                    <span class="font-semibold text-slate-700">${a.nama}</span>
+                    <span class="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-500">${a.lokasi}</span>
                 </div>
-            `).join('');
+            `).join('') || '<p class="text-center text-slate-400 text-xs py-4">Belum ada aset</p>';
 
             document.getElementById('recent-mutations-dashboard').innerHTML = mutations.slice(0,3).map(m=>`
                 <div class="p-3 bg-amber-50 rounded-xl flex justify-between items-center border border-amber-100">
-                    <span class="text-xs font-bold">${m.assetName}</span>
-                    <span class="text-[10px] text-amber-600">→ ${m.toLoc}</span>
+                    <span class="text-xs font-bold text-slate-700">${m.assetName}</span>
+                    <span class="text-[10px] text-amber-600 font-bold uppercase">${m.fromLoc} → ${m.toLoc}</span>
                 </div>
-            `).join('');
+            `).join('') || '<p class="text-center text-slate-400 text-xs py-4">Belum ada riwayat mutasi</p>';
         }
 
         // --- ASSET MANAGEMENT ---
         const assetForm = document.getElementById('assetForm');
         assetForm.onsubmit = async (e) => {
             e.preventDefault();
-            if (!user) return;
+            if (!user) return showNotification("Sesi tidak aktif, gagal simpan", "error");
 
             const editId = document.getElementById('edit-id').value;
             const data = {
@@ -658,30 +693,30 @@
                 foto: currentPhoto || null
             };
 
-            document.getElementById('loading-overlay').classList.remove('hidden');
-
             try {
                 if(editId) {
                     await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', editId), data);
                     showNotification("Aset berhasil diperbarui");
                 } else {
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), data);
-                    showNotification("Aset baru berhasil ditambahkan");
+                    showNotification("Aset baru berhasil disimpan di Cloud");
                 }
                 assetForm.reset();
                 document.getElementById('image-display').classList.add('hidden');
                 document.getElementById('photo-placeholder').classList.remove('hidden');
                 currentPhoto = null;
+                document.getElementById('edit-id').value = "";
+                document.getElementById('input-title').innerText = "Input Aset Baru";
                 switchTab('database');
             } catch (err) {
-                showNotification("Gagal menyimpan ke cloud", "error");
-            } finally {
-                document.getElementById('loading-overlay').classList.add('hidden');
+                console.error(err);
+                showNotification("Gagal sinkronisasi ke Cloud", "error");
             }
         };
 
         window.editAsset = (id) => {
             const a = assets.find(i=>i.id===id);
+            if (!a) return;
             switchTab('input');
             document.getElementById('edit-id').value = a.id;
             document.getElementById('nama').value = a.nama;
@@ -697,6 +732,9 @@
                 document.getElementById('image-display').src = a.foto;
                 document.getElementById('image-display').classList.remove('hidden');
                 document.getElementById('photo-placeholder').classList.add('hidden');
+            } else {
+                document.getElementById('image-display').classList.add('hidden');
+                document.getElementById('photo-placeholder').classList.remove('hidden');
             }
             document.getElementById('input-title').innerText = "Edit Aset: " + a.nama;
         };
@@ -712,6 +750,10 @@
 
         function renderDatabase() {
             const body = document.getElementById('db-table-body');
+            if (assets.length === 0) {
+                body.innerHTML = '<tr><td colspan="4" class="px-6 py-20 text-center text-slate-400 italic">Belum ada data aset di database.</td></tr>';
+                return;
+            }
             body.innerHTML = assets.map(a => `
                 <tr>
                     <td class="px-6 py-4"><b>${a.nama}</b><br><small class="text-slate-400 font-mono">${a.sn || '-'}</small></td>
@@ -783,7 +825,7 @@
             if (asset.foto) {
                 photoContainer.innerHTML = `<img src="${asset.foto}" class="w-full h-full object-cover cursor-pointer" onclick="openPhotoModalFromHistory('${asset.foto}')">`;
             } else {
-                photoContainer.innerHTML = `<span class="text-slate-400 text-xs italic">Tidak ada foto</span>`;
+                photoContainer.innerHTML = `<span class="text-slate-400 text-xs italic">Tidak ada foto aset</span>`;
             }
 
             const assetMutations = mutations.filter(m => m.assetName === asset.nama);
@@ -801,7 +843,7 @@
                                 <span class="text-slate-400 font-normal">${new Date(m.time).toLocaleDateString('id-ID')}</span>
                             </div>
                             <p class="text-slate-500">${m.note || 'Pindah lokasi tanpa catatan.'}</p>
-                            <div class="mt-2 text-[10px] text-sky-600 font-bold uppercase">Status: ${m.status}</div>
+                            <div class="mt-2 text-[10px] text-sky-600 font-bold uppercase">Kondisi Saat Mutasi: ${m.status}</div>
                         </div>
                     </div>
                 `).join('');
@@ -814,13 +856,14 @@
         // --- MUTATIONS ---
         function updateMutateItemDropdown() {
             const dd = document.getElementById('mutate-item');
+            if (!dd) return;
             dd.innerHTML = '<option value="">Pilih Aset...</option>';
             assets.forEach(a => dd.innerHTML += `<option value="${a.id}">${a.nama} (@${a.lokasi})</option>`);
         }
 
         document.getElementById('mutationForm').onsubmit = async (e) => {
             e.preventDefault();
-            if (!user) return;
+            if (!user) return showNotification("Gagal simpan, sesi cloud terputus", "error");
 
             const id = document.getElementById('mutate-item').value;
             const assetIdx = assets.findIndex(a=>a.id===id);
@@ -829,8 +872,6 @@
             const toLoc = document.getElementById('mutate-location').value;
             const status = document.getElementById('mutate-status').value;
             const note = document.getElementById('mutate-note').value;
-
-            document.getElementById('loading-overlay').classList.remove('hidden');
 
             try {
                 // Record mutation
@@ -849,21 +890,23 @@
                     kondisi: status
                 });
 
-                showNotification("Mutasi berhasil dicatat");
+                showNotification("Lokasi aset berhasil dipindahkan");
                 document.getElementById('mutationForm').reset();
                 switchTab('mutation-db');
             } catch (err) {
-                showNotification("Gagal mencatat mutasi", "error");
-            } finally {
-                document.getElementById('loading-overlay').classList.add('hidden');
+                showNotification("Gagal memperbarui mutasi", "error");
             }
         };
 
         function renderMutationDatabase() {
             const body = document.getElementById('mutation-db-body');
+            if (mutations.length === 0) {
+                body.innerHTML = '<tr><td colspan="4" class="px-6 py-10 text-center text-slate-400 italic">Belum ada riwayat mutasi.</td></tr>';
+                return;
+            }
             body.innerHTML = mutations.map(m => `
                 <tr class="text-sm">
-                    <td class="px-6 py-4 text-slate-400">${new Date(m.time).toLocaleDateString()}</td>
+                    <td class="px-6 py-4 text-slate-400 font-mono text-[10px]">${new Date(m.time).toLocaleDateString('id-ID')}</td>
                     <td class="px-6 py-4"><b>${m.assetName}</b></td>
                     <td class="px-6 py-4"><span class="text-rose-500 font-bold">${m.fromLoc}</span> → <span class="text-sky-600 font-bold">${m.toLoc}</span></td>
                     <td class="px-6 py-4"><button onclick="deleteMutation('${m.id}')" class="text-rose-500 hover:underline">Hapus</button></td>
@@ -872,7 +915,7 @@
         }
 
         window.deleteMutation = async (id) => {
-            if(confirm('Hapus riwayat mutasi ini?')) {
+            if(confirm('Hapus riwayat mutasi ini dari Cloud?')) {
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id));
             }
         };
@@ -883,7 +926,7 @@
             if(!id) {
                 document.getElementById('roomNameInput').value = "";
                 document.getElementById('room-edit-id').value = "";
-                document.getElementById('roomModalTitle').innerText = "Tambah Ruangan";
+                document.getElementById('roomModalTitle').innerText = "Tambah Ruangan Baru";
             } else {
                 const r = rooms.find(x => x.id === id);
                 document.getElementById('roomNameInput').value = r.name;
@@ -906,8 +949,8 @@
                     await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name });
                 }
                 closeRoomModal();
-                showNotification("Ruangan berhasil disimpan");
-            } catch (err) { showNotification("Gagal simpan ruangan", "error"); }
+                showNotification("Ruangan berhasil diperbarui");
+            } catch (err) { showNotification("Gagal simpan ruangan ke Cloud", "error"); }
         };
 
         window.deleteRoom = async (id) => {
@@ -918,12 +961,16 @@
 
         function renderRooms() {
             const body = document.getElementById('rooms-table-body');
+            if (rooms.length === 0) {
+                body.innerHTML = '<tr><td colspan="2" class="px-6 py-10 text-center text-slate-400 italic">Mendata ruangan...</td></tr>';
+                return;
+            }
             body.innerHTML = rooms.map(r => `
                 <tr class="text-sm">
-                    <td class="px-6 py-4 font-bold">${r.name}</td>
+                    <td class="px-6 py-4 font-bold text-slate-700">${r.name}</td>
                     <td class="px-6 py-4 text-right space-x-4">
-                        <button onclick="openRoomModal('${r.id}')" class="text-sky-600">Edit</button>
-                        <button onclick="deleteRoom('${r.id}')" class="text-rose-600">Hapus</button>
+                        <button onclick="openRoomModal('${r.id}')" class="text-sky-600 font-bold hover:underline">Edit</button>
+                        <button onclick="deleteRoom('${r.id}')" class="text-rose-600 font-bold hover:underline">Hapus</button>
                     </td>
                 </tr>
             `).join('');
@@ -946,7 +993,7 @@
             const assetCountEl = document.getElementById('room-asset-count');
             
             if(!roomName) {
-                body.innerHTML = '<tr><td colspan="8" class="px-6 py-20 text-center text-slate-400 italic">Pilih ruangan terlebih dahulu...</td></tr>';
+                body.innerHTML = '<tr><td colspan="8" class="px-6 py-20 text-center text-slate-400 italic">Silahkan pilih ruangan pada menu filter di atas...</td></tr>';
                 displayHeader.innerText = "-";
                 assetCountEl.innerText = "0";
                 return;
@@ -957,16 +1004,16 @@
             assetCountEl.innerText = filtered.length;
 
             if(filtered.length === 0) {
-                body.innerHTML = '<tr><td colspan="8" class="px-6 py-20 text-center text-slate-400 italic">Tidak ada aset di ruangan ini.</td></tr>';
+                body.innerHTML = '<tr><td colspan="8" class="px-6 py-20 text-center text-slate-400 italic">Tidak ada aset terdaftar di ruangan ini.</td></tr>';
             } else {
                 body.innerHTML = filtered.map((a, i) => `
                     <tr class="text-sm">
                         <td class="px-4 py-3 text-center font-mono">${i + 1}</td>
-                        <td class="px-4 py-3 font-bold">${a.nama}</td>
+                        <td class="px-4 py-3 font-bold text-slate-800">${a.nama}</td>
                         <td class="px-4 py-3">${a.merk}</td>
                         <td class="px-4 py-3 text-slate-600 font-mono text-[10px]">${a.sn || '-'}</td>
                         <td class="px-4 py-3 text-slate-500">${a.tgl_beli || '-'}</td>
-                        <td class="px-4 py-3 font-mono">${formatRupiah(a.harga)}</td>
+                        <td class="px-4 py-3 font-mono text-slate-700">${formatRupiah(a.harga)}</td>
                         <td class="px-4 py-3 text-xs text-slate-400">${a.vendor || '-'}</td>
                         <td class="px-4 py-3 font-bold uppercase ${a.kondisi === 'Rusak' ? 'text-rose-600' : 'text-emerald-600'}">${a.kondisi}</td>
                     </tr>
@@ -991,7 +1038,10 @@
                 document.getElementById('image-display').classList.remove('hidden');
                 document.getElementById('photo-placeholder').classList.add('hidden');
             };
-            if(file) reader.readAsDataURL(file);
+            if(file) {
+                if (file.size > 1024 * 1024) return showNotification("Ukuran foto terlalu besar (maks 1MB)", "error");
+                reader.readAsDataURL(file);
+            }
         };
 
         window.openPhotoModalFromHistory = (src) => {
