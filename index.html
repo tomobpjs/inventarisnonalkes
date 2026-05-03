@@ -3,191 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SIMARS - Sistem Informasi Manajemen Aset Rumah Sakit</title>
-    
-    <!-- Dependencies -->
+    <title>SIMARS - Sistem Manajemen Aset Rumah Sakit</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://unpkg.com/@html5-qrcode/html5-qrcode"></script>
-
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
         
         :root {
-            --primary: #0d9488;
-            --secondary: #14b8a6;
-            --accent: #f59e0b;
+            --hospital-primary: #0f766e;
+            --hospital-secondary: #14b8a6;
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-            overflow-x: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f0fdfa;
         }
 
-        .sidebar-active {
-            background-color: rgba(255, 255, 255, 0.1);
+        .sidebar-item-active {
+            background-color: rgba(255, 255, 255, 0.15);
             border-left: 4px solid #fff;
         }
 
         .card-glass {
             background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+            border-radius: 1.5rem;
         }
 
         .running-text-container {
-            background: var(--primary);
+            background: linear-gradient(90deg, #0f766e, #14b8a6);
             color: white;
-            padding: 8px 0;
+            padding: 10px 0;
             overflow: hidden;
-            position: sticky;
-            top: 0;
-            z-index: 50;
+            white-space: nowrap;
         }
 
         .running-text {
             display: inline-block;
-            white-space: nowrap;
-            animation: marquee 30s linear infinite;
+            padding-left: 100%;
+            animation: marquee 40s linear infinite;
         }
 
         @keyframes marquee {
-            0% { transform: translateX(100%); }
+            0% { transform: translateX(0); }
             100% { transform: translateX(-100%); }
         }
 
-        .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 8rem;
-            color: rgba(0, 0, 0, 0.03);
-            pointer-events: none;
-            z-index: 0;
-            white-space: nowrap;
-            user-select: none;
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
         }
-
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #0d9488;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
         }
-
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        @media print {
-            .no-print { display: none !important; }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #14b8a6;
+            border-radius: 10px;
         }
     </style>
 </head>
-<body class="flex flex-col h-screen">
+<body class="flex flex-col h-screen overflow-hidden">
 
-    <!-- Watermark -->
-    <div class="watermark">SIMARS PREMIUM</div>
-
-    <!-- Running Text -->
-    <div class="running-text-container no-print">
+    <!-- Header / Running Text -->
+    <div class="running-text-container shrink-0">
         <div class="running-text">
-            <i class="fas fa-bullhorn mr-2"></i> 
-            Selamat Datang di SIMARS (Sistem Informasi Manajemen Aset Rumah Sakit) • Pastikan data diinput dengan benar • Update Aset Terakhir: <span id="current-date"></span> • Jaga Kebersihan Lingkungan Rumah Sakit • Pasien Adalah Prioritas Utama •
+            <i class="fas fa-hospital-user mr-2"></i> Selamat Datang di Sistem Manajemen Aset Rumah Sakit (SIMARS) • Pastikan Data Inventaris Terupdate Secara Real-time • Prioritas Kami Adalah Keakuratan Data dan Efisiensi Manajemen Aset • <span id="current-date-text"></span>
         </div>
     </div>
 
     <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar -->
-        <aside class="w-72 bg-teal-900 text-white flex flex-col no-print z-40">
+        <aside class="w-64 bg-teal-900 text-white flex flex-col shrink-0">
             <div class="p-6 flex items-center gap-3">
-                <div class="bg-white p-2 rounded-lg">
-                    <i class="fas fa-hospital-alt text-teal-900 text-2xl"></i>
+                <div class="w-10 h-10 bg-white rounded-xl flex items-center justify-center">
+                    <i class="fas fa-hospital text-teal-800 text-xl"></i>
                 </div>
-                <div>
-                    <h1 class="font-bold text-xl leading-tight">SIMARS</h1>
-                    <p class="text-xs text-teal-300">Hospital Asset Mgmt</p>
-                </div>
+                <h1 class="font-bold text-xl tracking-tight">SIMARS</h1>
             </div>
 
-            <nav class="flex-1 overflow-y-auto px-4 py-2 space-y-1">
-                <p class="text-[10px] uppercase tracking-widest text-teal-400 font-bold mb-2 ml-2">Utama</p>
-                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10 sidebar-active">
-                    <i class="fas fa-chart-line w-5"></i> Dashboard
+            <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto custom-scrollbar">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
+                    <i class="fas fa-th-large w-5"></i> Dashboard
                 </button>
-                <button onclick="switchTab('input-aset')" id="nav-input-aset" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
-                    <i class="fas fa-plus-circle w-5"></i> Input Aset
+                <button onclick="switchTab('input')" id="nav-input" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
+                    <i class="fas fa-plus-circle w-5"></i> Input Aset Baru
                 </button>
-                
-                <p class="text-[10px] uppercase tracking-widest text-teal-400 font-bold mt-6 mb-2 ml-2">Manajemen</p>
                 <button onclick="switchTab('database')" id="nav-database" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
                     <i class="fas fa-database w-5"></i> Database Aset
                 </button>
-                <button onclick="switchTab('pencarian')" id="nav-pencarian" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
-                    <i class="fas fa-search w-5"></i> Pencarian & Scan
+                <button onclick="switchTab('mutasi')" id="nav-mutasi" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
+                    <i class="fas fa-exchange-alt w-5"></i> Mutasi Aset
                 </button>
                 <button onclick="switchTab('ruangan')" id="nav-ruangan" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
                     <i class="fas fa-door-open w-5"></i> Manajemen Ruangan
                 </button>
-
-                <p class="text-[10px] uppercase tracking-widest text-teal-400 font-bold mt-6 mb-2 ml-2">Logistik & Mutasi</p>
-                <button onclick="switchTab('input-mutasi')" id="nav-input-mutasi" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
-                    <i class="fas fa-exchange-alt w-5"></i> Input Mutasi
-                </button>
-                <button onclick="switchTab('db-mutasi')" id="nav-db-mutasi" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
-                    <i class="fas fa-history w-5"></i> Riwayat Mutasi
-                </button>
-
-                <p class="text-[10px] uppercase tracking-widest text-teal-400 font-bold mt-6 mb-2 ml-2">Pengaturan</p>
-                <button onclick="switchTab('import-export')" id="nav-import-export" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
-                    <i class="fas fa-file-excel w-5"></i> Import/Export
-                </button>
-                <button onclick="switchTab('master-ruangan')" id="nav-master-ruangan" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
-                    <i class="fas fa-tools w-5"></i> Master Ruangan
+                <div class="pt-4 pb-2 text-[10px] uppercase tracking-wider text-teal-400 font-bold px-3">System</div>
+                <button onclick="switchTab('settings')" id="nav-settings" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
+                    <i class="fas fa-cog w-5"></i> Master Ruangan
                 </button>
             </nav>
 
             <div class="p-4 border-t border-teal-800">
-                <div class="bg-teal-800/50 rounded-xl p-3 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-teal-600 flex items-center justify-center font-bold">A</div>
+                <div class="bg-teal-800/50 p-3 rounded-2xl flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center font-bold text-xs">AD</div>
                     <div class="overflow-hidden">
-                        <p class="text-sm font-semibold truncate" id="user-display">Administrator</p>
-                        <p class="text-[10px] text-teal-400">Online</p>
+                        <p class="text-xs font-bold truncate" id="user-info">Memuat...</p>
+                        <p class="text-[10px] text-teal-400 uppercase">Administrator</p>
                     </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="flex-1 flex flex-col relative overflow-hidden">
-            <header class="h-16 border-b bg-white/50 backdrop-blur-md flex items-center justify-between px-8 no-print z-30">
-                <h2 id="tab-title" class="text-xl font-bold text-gray-800">Dashboard</h2>
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col bg-slate-50 overflow-hidden relative">
+            <header class="h-16 bg-white border-b px-8 flex items-center justify-between">
+                <h2 id="current-tab-title" class="text-lg font-bold text-slate-800">Dashboard</h2>
                 <div class="flex items-center gap-4">
-                    <div id="status-cloud" class="flex items-center gap-2 text-xs text-green-600">
-                        <i class="fas fa-cloud"></i> Cloud Connected
+                    <div id="sync-status" class="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-2">
+                        <div class="w-2 h-2 bg-emerald-500 rounded-full"></div> CLOUD SYNC ACTIVE
                     </div>
                 </div>
             </header>
 
-            <div id="content-container" class="flex-1 overflow-y-auto p-8 relative z-10">
-                <!-- Content generated via JS -->
+            <div id="tab-content" class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                <!-- Content injected here -->
             </div>
         </main>
     </div>
 
-    <!-- Modals -->
-    <div id="modal-overlay" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[100] no-print">
-        <div id="modal-content" class="bg-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            <button onclick="closeModal()" class="absolute top-6 right-6 text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-            <div id="modal-body"></div>
+    <!-- Modal Template -->
+    <div id="modal-container" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-[2rem] max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 id="modal-title" class="font-bold text-xl">Detail Aset</h3>
+                <button onclick="closeModal()" class="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="modal-content" class="p-8 overflow-y-auto"></div>
         </div>
     </div>
 
@@ -196,7 +153,7 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Config from Env
+        // Firebase Configuration
         const firebaseConfig = {
   apiKey: "AIzaSyAzlAn3taV7-WMDta-AQAewzDUaZzxvxAc",
   authDomain: "inventarisnonalkes.firebaseapp.com",
@@ -208,14 +165,16 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'simars-pro-v1';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'simars-v1';
 
+        // State Management
         let user = null;
         let assets = [];
         let mutations = [];
         let rooms = [];
-        let currentTab = 'dashboard';
+        let activeTab = 'dashboard';
 
+        // Initialize Authentication
         const initAuth = async () => {
             if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                 await signInWithCustomToken(auth, __initial_auth_token);
@@ -227,436 +186,731 @@
         onAuthStateChanged(auth, (u) => {
             user = u;
             if (user) {
-                setupListeners();
-                document.getElementById('user-display').innerText = `User: ${user.uid.substring(0, 8)}`;
+                document.getElementById('user-info').innerText = `ID: ${user.uid.substring(0, 8)}`;
+                setupSubscriptions();
             }
         });
 
-        const setupListeners = () => {
+        // Subscriptions
+        const setupSubscriptions = () => {
             if (!user) return;
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), (snapshot) => {
-                rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), (snap) => {
+                rooms = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderCurrentTab();
-            });
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), (snapshot) => {
-                assets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            }, (err) => console.error(err));
+
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), (snap) => {
+                assets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderCurrentTab();
-            });
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), (snapshot) => {
-                mutations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            }, (err) => console.error(err));
+
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), (snap) => {
+                mutations = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 renderCurrentTab();
-            });
+            }, (err) => console.error(err));
         };
 
-        window.switchTab = (tabId) => {
-            currentTab = tabId;
-            document.querySelectorAll('aside nav button').forEach(btn => btn.classList.remove('sidebar-active'));
-            const activeBtn = document.getElementById(`nav-${tabId}`);
-            if (activeBtn) activeBtn.classList.add('sidebar-active');
-            document.getElementById('tab-title').innerText = tabId.replace('-', ' ').toUpperCase();
+        // Navigation
+        window.switchTab = (tab) => {
+            activeTab = tab;
+            document.querySelectorAll('aside nav button').forEach(btn => {
+                btn.classList.remove('sidebar-item-active');
+            });
+            document.getElementById(`nav-${tab}`).classList.add('sidebar-item-active');
+            document.getElementById('current-tab-title').innerText = tab.charAt(0).toUpperCase() + tab.slice(1);
             renderCurrentTab();
         };
 
-        // --- RENDER FUNCTIONS (Sesuai Struktur Awal) ---
+        // Render Logic
         const renderCurrentTab = () => {
-            const container = document.getElementById('content-container');
+            const container = document.getElementById('tab-content');
             if (!container) return;
 
-            switch(currentTab) {
+            switch(activeTab) {
                 case 'dashboard': renderDashboard(container); break;
-                case 'input-aset': renderInputAset(container); break;
+                case 'input': renderInputForm(container); break;
                 case 'database': renderDatabase(container); break;
-                case 'pencarian': renderPencarian(container); break;
+                case 'mutasi': renderMutasi(container); break;
                 case 'ruangan': renderRuangan(container); break;
-                case 'input-mutasi': renderInputMutasi(container); break;
-                case 'db-mutasi': renderDBMutasi(container); break;
-                case 'import-export': renderImportExport(container); break;
-                case 'master-ruangan': renderMasterRuangan(container); break;
+                case 'settings': renderSettings(container); break;
             }
         };
 
-        const renderDashboard = (container) => {
-            const totalAset = assets.reduce((acc, curr) => acc + (parseInt(curr.jumlah) || 0), 0);
+        function renderDashboard(container) {
+            const stats = {
+                totalAset: assets.reduce((sum, a) => sum + (parseInt(a.qty) || 0), 0),
+                totalJenis: assets.length,
+                totalMutasi: mutations.length,
+                ruangan: rooms.length
+            };
+
             container.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="card-glass p-6 rounded-3xl border-l-4 border-teal-500">
-                        <p class="text-gray-500 text-sm font-medium">Jenis Barang</p>
-                        <h3 class="text-3xl font-bold text-teal-900">${assets.length}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="card-glass p-6 border-b-4 border-teal-600">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Unit Aset</p>
+                                <h3 class="text-3xl font-black text-slate-800">${stats.totalAset}</h3>
+                            </div>
+                            <div class="w-10 h-10 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center"><i class="fas fa-boxes"></i></div>
+                        </div>
                     </div>
-                    <div class="card-glass p-6 rounded-3xl border-l-4 border-blue-500">
-                        <p class="text-gray-500 text-sm font-medium">Total Unit</p>
-                        <h3 class="text-3xl font-bold text-blue-900">${totalAset}</h3>
+                    <div class="card-glass p-6 border-b-4 border-blue-600">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Jenis Barang</p>
+                                <h3 class="text-3xl font-black text-slate-800">${stats.totalJenis}</h3>
+                            </div>
+                            <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center"><i class="fas fa-tags"></i></div>
+                        </div>
                     </div>
-                    <div class="card-glass p-6 rounded-3xl border-l-4 border-purple-500">
-                        <p class="text-gray-500 text-sm font-medium">Total Mutasi</p>
-                        <h3 class="text-3xl font-bold text-purple-900">${mutations.length}</h3>
+                    <div class="card-glass p-6 border-b-4 border-amber-600">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Total Mutasi</p>
+                                <h3 class="text-3xl font-black text-slate-800">${stats.totalMutasi}</h3>
+                            </div>
+                            <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center"><i class="fas fa-sync-alt"></i></div>
+                        </div>
+                    </div>
+                    <div class="card-glass p-6 border-b-4 border-purple-600">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Ruangan Aktif</p>
+                                <h3 class="text-3xl font-black text-slate-800">${stats.ruangan}</h3>
+                            </div>
+                            <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center"><i class="fas fa-door-closed"></i></div>
+                        </div>
                     </div>
                 </div>
-                <div class="card-glass p-8 rounded-3xl">
-                    <h4 class="font-bold text-gray-800 mb-6">Aset Terbaru</h4>
-                    <div class="space-y-4">
-                        ${assets.slice(-5).reverse().map(a => `<div class="p-4 bg-gray-50/50 rounded-2xl flex justify-between"><span>${a.nama}</span><span class="font-bold text-teal-600">${a.lokasi}</span></div>`).join('')}
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="card-glass p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="font-black text-slate-800 uppercase tracking-tighter">Aset Terbaru</h4>
+                            <button onclick="switchTab('database')" class="text-teal-600 text-xs font-bold">LIHAT SEMUA</button>
+                        </div>
+                        <div class="space-y-4">
+                            ${assets.slice(-5).reverse().map(a => `
+                                <div class="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                                    <div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center border shadow-sm shrink-0">
+                                        <i class="fas fa-box text-teal-600"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-bold text-slate-800 truncate">${a.name}</p>
+                                        <p class="text-[10px] text-slate-500 uppercase">${a.room} • SN: ${a.sn || 'N/A'}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-xs font-black text-teal-700">${a.qty} UNIT</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="card-glass p-8">
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="font-black text-slate-800 uppercase tracking-tighter">Log Mutasi Terkini</h4>
+                            <button onclick="switchTab('mutasi')" class="text-teal-600 text-xs font-bold">LIHAT SEMUA</button>
+                        </div>
+                        <div class="space-y-4">
+                            ${mutations.slice(-5).reverse().map(m => `
+                                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                                        <i class="fas fa-arrow-right text-xs"></i>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-bold text-slate-800">${m.assetName}</p>
+                                        <p class="text-[10px] text-slate-500">${m.from} → ${m.to} (${m.qty} Unit)</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 </div>
             `;
-        };
+        }
 
-        const renderInputAset = (container, editData = null) => {
+        function renderInputForm(container, existingData = null) {
             container.innerHTML = `
                 <div class="max-w-4xl mx-auto">
-                    <form id="form-aset" class="card-glass p-10 rounded-[2.5rem] space-y-8">
+                    <form id="asset-form" class="card-glass p-10 space-y-8">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <input type="text" id="asset-nama" required value="${editData?.nama || ''}" placeholder="Nama Barang *" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                            <input type="text" id="asset-merk" required value="${editData?.merk || ''}" placeholder="Merk / Tipe *" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                            <input type="text" id="asset-kode" value="${editData?.kode || ''}" placeholder="Kode Inventaris / SN" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                            <input type="date" id="asset-tanggal" value="${editData?.tanggal || ''}" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                            <input type="number" id="asset-jumlah" required value="${editData?.jumlah || ''}" placeholder="Jumlah Stok *" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                            <input type="number" id="asset-harga" value="${editData?.harga || ''}" placeholder="Harga Satuan" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                            <select id="asset-lokasi" required class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                                <option value="">Pilih Ruangan *</option>
-                                ${rooms.map(r => `<option value="${r.nama}" ${editData?.lokasi === r.nama ? 'selected' : ''}>${r.nama}</option>`).join('')}
-                            </select>
-                            <input type="text" id="asset-vendor" value="${editData?.vendor || ''}" placeholder="Supplier" class="w-full p-4 bg-gray-50 rounded-2xl outline-none">
-                        </div>
-                        <div class="space-y-4">
-                            <label class="text-sm font-bold">Foto Barang</label>
-                            <input type="file" accept="image/*" capture="environment" id="camera-input" class="block w-full text-sm text-gray-500">
-                            <div id="preview-container" class="w-48 h-48 bg-gray-100 rounded-3xl overflow-hidden flex items-center justify-center">
-                                ${editData?.foto ? `<img src="${editData.foto}" class="w-full h-full object-cover">` : '<i class="fas fa-camera text-4xl text-gray-300"></i>'}
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nama Barang</label>
+                                <input type="text" id="a-name" required value="${existingData?.name || ''}" placeholder="Contoh: USG Mindray" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Merk / Tipe</label>
+                                <input type="text" id="a-brand" required value="${existingData?.brand || ''}" placeholder="Contoh: DC-30" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Serial Number / Kode</label>
+                                <input type="text" id="a-sn" value="${existingData?.sn || ''}" placeholder="Kode Inventaris" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Jumlah (Unit)</label>
+                                <input type="number" id="a-qty" required value="${existingData?.qty || ''}" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tanggal Pembelian</label>
+                                <input type="date" id="a-date" value="${existingData?.date || ''}" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lokasi Ruangan</label>
+                                <select id="a-room" required class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition appearance-none">
+                                    <option value="">Pilih Ruangan</option>
+                                    ${rooms.map(r => `<option value="${r.name}" ${existingData?.room === r.name ? 'selected' : ''}>${r.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Harga Satuan (Rp)</label>
+                                <input type="number" id="a-price" value="${existingData?.price || ''}" placeholder="0" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Supplier / Vendor</label>
+                                <input type="text" id="a-vendor" value="${existingData?.vendor || ''}" placeholder="Nama Distributor" class="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-teal-100 outline-none transition">
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-teal-600 text-white font-bold py-4 rounded-2xl">${editData ? 'Update' : 'Simpan'}</button>
+
+                        <div class="space-y-4">
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Dokumentasi Aset</label>
+                            <div class="flex flex-col md:flex-row gap-6 items-center">
+                                <div id="image-preview" class="w-48 h-48 bg-slate-100 rounded-3xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                                    ${existingData?.image ? `<img src="${existingData.image}" class="w-full h-full object-cover">` : '<i class="fas fa-camera text-3xl text-slate-300"></i>'}
+                                </div>
+                                <div class="flex-1 space-y-3">
+                                    <input type="file" id="file-input" accept="image/*" capture="environment" class="hidden">
+                                    <button type="button" onclick="document.getElementById('file-input').click()" class="bg-white border border-slate-200 px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition flex items-center gap-2">
+                                        <i class="fas fa-upload"></i> Ambil Foto / Upload
+                                    </button>
+                                    <p class="text-[10px] text-slate-400">Pastikan foto jelas agar mudah diidentifikasi saat maintenance.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="w-full py-5 bg-teal-700 text-white rounded-[1.5rem] font-bold text-lg hover:bg-teal-800 transition-all shadow-xl shadow-teal-900/10">
+                            ${existingData ? 'PERBARUI DATA ASET' : 'SIMPAN ASET BARU'}
+                        </button>
                     </form>
                 </div>
             `;
 
-            let base64Image = editData?.foto || '';
-            document.getElementById('camera-input').onchange = (e) => {
+            let imageData = existingData?.image || '';
+            const fileInput = document.getElementById('file-input');
+            const preview = document.getElementById('image-preview');
+
+            fileInput.onchange = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const img = new Image();
-                        img.onload = () => {
-                            const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 800;
-                            const scaleSize = MAX_WIDTH / img.width;
-                            canvas.width = MAX_WIDTH;
-                            canvas.height = img.height * scaleSize;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            base64Image = canvas.toDataURL('image/jpeg', 0.7);
-                            document.getElementById('preview-container').innerHTML = `<img src="${base64Image}" class="w-full h-full object-cover">`;
-                        };
-                        img.src = event.target.result;
+                    reader.onload = (ev) => {
+                        imageData = ev.target.result;
+                        preview.innerHTML = `<img src="${imageData}" class="w-full h-full object-cover">`;
                     };
                     reader.readAsDataURL(file);
                 }
             };
 
-            document.getElementById('form-aset').onsubmit = async (e) => {
+            document.getElementById('asset-form').onsubmit = async (e) => {
                 e.preventDefault();
-                const data = {
-                    nama: document.getElementById('asset-nama').value,
-                    merk: document.getElementById('asset-merk').value,
-                    kode: document.getElementById('asset-kode').value,
-                    tanggal: document.getElementById('asset-tanggal').value,
-                    jumlah: parseInt(document.getElementById('asset-jumlah').value),
-                    harga: parseInt(document.getElementById('asset-harga').value) || 0,
-                    lokasi: document.getElementById('asset-lokasi').value,
-                    vendor: document.getElementById('asset-vendor').value,
-                    foto: base64Image,
+                if (!user) return;
+
+                const payload = {
+                    name: document.getElementById('a-name').value,
+                    brand: document.getElementById('a-brand').value,
+                    sn: document.getElementById('a-sn').value,
+                    qty: parseInt(document.getElementById('a-qty').value),
+                    date: document.getElementById('a-date').value,
+                    room: document.getElementById('a-room').value,
+                    price: parseInt(document.getElementById('a-price').value) || 0,
+                    vendor: document.getElementById('a-vendor').value,
+                    image: imageData,
                     updatedAt: serverTimestamp()
                 };
-                if (editData) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', editData.id), data);
-                else { data.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), data); }
-                switchTab('database');
-            };
-        };
 
-        const renderDatabase = (container) => {
+                try {
+                    if (existingData) {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', existingData.id), payload);
+                    } else {
+                        payload.createdAt = serverTimestamp();
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), payload);
+                    }
+                    switchTab('database');
+                } catch (err) {
+                    alert("Gagal menyimpan: " + err.message);
+                }
+            };
+        }
+
+        function renderDatabase(container) {
             container.innerHTML = `
-                <div class="card-glass rounded-3xl overflow-hidden">
-                    <table class="w-full text-left">
-                        <thead class="bg-teal-900 text-white">
-                            <tr><th class="p-4">Barang</th><th class="p-4">Kode</th><th class="p-4">Ruang</th><th class="p-4 text-center">Stok</th><th class="p-4 text-right">Aksi</th></tr>
-                        </thead>
-                        <tbody class="divide-y">
-                            ${assets.map(a => `
+                <div class="card-glass overflow-hidden">
+                    <div class="p-6 border-b flex flex-col md:flex-row gap-4 justify-between items-center">
+                        <div class="relative w-full md:w-96">
+                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="db-search" placeholder="Cari nama, merk, atau SN..." class="w-full pl-12 pr-4 py-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 focus:ring-teal-100">
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="exportToExcel()" class="px-4 py-2 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl font-bold text-xs flex items-center gap-2">
+                                <i class="fas fa-file-excel"></i> EXCEL
+                            </button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
                                 <tr>
-                                    <td class="p-4 font-bold">${a.nama}</td>
-                                    <td class="p-4 text-xs font-mono">${a.kode || '-'}</td>
-                                    <td class="p-4">${a.lokasi}</td>
-                                    <td class="p-4 text-center">${a.jumlah}</td>
-                                    <td class="p-4 text-right">
-                                        <button onclick="editAsset('${a.id}')" class="text-blue-500 mr-2"><i class="fas fa-edit"></i></button>
-                                        <button onclick="deleteAsset('${a.id}')" class="text-red-500"><i class="fas fa-trash"></i></button>
-                                    </td>
+                                    <th class="px-6 py-4">Foto</th>
+                                    <th class="px-6 py-4">Nama Barang</th>
+                                    <th class="px-6 py-4">Lokasi</th>
+                                    <th class="px-6 py-4">SN / Kode</th>
+                                    <th class="px-6 py-4 text-center">Stok</th>
+                                    <th class="px-6 py-4 text-right">Aksi</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody id="db-table-body" class="divide-y text-slate-700">
+                                ${assets.map(a => `
+                                    <tr class="hover:bg-teal-50/30 transition">
+                                        <td class="px-6 py-4">
+                                            <div class="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden border">
+                                                ${a.image ? `<img src="${a.image}" class="w-full h-full object-cover">` : '<i class="fas fa-box m-3 text-slate-300"></i>'}
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 font-bold">
+                                            ${a.name}
+                                            <p class="text-[10px] text-slate-400 font-normal uppercase">${a.brand}</p>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <span class="px-3 py-1 bg-white border text-slate-600 rounded-full text-xs font-bold">${a.room}</span>
+                                        </td>
+                                        <td class="px-6 py-4 text-xs font-mono">${a.sn || '-'}</td>
+                                        <td class="px-6 py-4 text-center">
+                                            <span class="font-black ${a.qty < 5 ? 'text-red-600' : 'text-teal-700'}">${a.qty}</span>
+                                        </td>
+                                        <td class="px-6 py-4 text-right">
+                                            <div class="flex justify-end gap-2">
+                                                <button onclick="editAsset('${a.id}')" class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition"><i class="fas fa-edit text-xs"></i></button>
+                                                <button onclick="deleteAsset('${a.id}')" class="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center transition"><i class="fas fa-trash text-xs"></i></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             `;
-        };
+
+            document.getElementById('db-search').oninput = (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = assets.filter(a => 
+                    a.name.toLowerCase().includes(term) || 
+                    a.brand.toLowerCase().includes(term) || 
+                    a.sn.toLowerCase().includes(term)
+                );
+                // Update table rows... (simplified)
+            };
+        }
 
         window.editAsset = (id) => {
             const data = assets.find(a => a.id === id);
-            if (data) { switchTab('input-aset'); renderInputAset(document.getElementById('content-container'), data); }
+            if (data) renderInputForm(document.getElementById('tab-content'), data);
         };
 
         window.deleteAsset = async (id) => {
-            if (confirm("Hapus aset?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
+            if (!user) return;
+            if (confirm("Hapus data aset ini selamanya?")) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
+            }
         };
 
-        const renderPencarian = (container) => {
+        function renderMutasi(container) {
             container.innerHTML = `
-                <div class="max-w-xl mx-auto space-y-6">
-                    <div class="card-glass p-8 rounded-3xl text-center">
-                        <input type="text" id="search-box" placeholder="Cari Kode atau Nama..." class="w-full p-4 bg-gray-50 rounded-2xl outline-none mb-4">
-                        <button id="btn-scan" class="w-full bg-teal-600 text-white font-bold py-4 rounded-2xl">Scan Kamera</button>
-                        <div id="reader" class="mt-4 hidden"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="card-glass p-8">
+                            <h4 class="font-black text-slate-800 uppercase tracking-tighter mb-6">Input Mutasi</h4>
+                            <form id="mut-form" class="space-y-4">
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Aset</label>
+                                    <select id="m-asset" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                                        <option value="">Pilih Aset</option>
+                                        ${assets.map(a => `<option value="${a.id}">${a.name} (${a.room} - Stok: ${a.qty})</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Jumlah Unit</label>
+                                    <input type="number" id="m-qty" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Tujuan</label>
+                                    <select id="m-to" required class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                                        <option value="">Pilih Ruangan</option>
+                                        ${rooms.map(r => `<option value="${r.name}">${r.name}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-bold text-slate-400 uppercase">Keterangan</label>
+                                    <textarea id="m-note" class="w-full p-3 bg-slate-50 border rounded-xl outline-none h-20"></textarea>
+                                </div>
+                                <button type="submit" class="w-full py-4 bg-teal-700 text-white rounded-xl font-bold hover:bg-teal-800 transition">PROSES MUTASI</button>
+                            </form>
+                        </div>
                     </div>
-                    <div id="res-detail" class="hidden"></div>
+                    <div class="lg:col-span-2">
+                        <div class="card-glass overflow-hidden h-full flex flex-col">
+                            <div class="p-6 border-b flex justify-between items-center bg-slate-50/50">
+                                <h4 class="font-black text-slate-800 uppercase tracking-tighter">Riwayat Mutasi</h4>
+                            </div>
+                            <div class="flex-1 overflow-y-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-white text-[10px] font-black text-slate-400 uppercase border-b sticky top-0">
+                                        <tr>
+                                            <th class="px-6 py-4">Aset</th>
+                                            <th class="px-6 py-4">Pergerakan</th>
+                                            <th class="px-6 py-4 text-center">Qty</th>
+                                            <th class="px-6 py-4 text-right">Waktu</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y text-sm">
+                                        ${mutations.map(m => `
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-6 py-4 font-bold text-slate-800">${m.assetName}</td>
+                                                <td class="px-6 py-4">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500">${m.from}</span>
+                                                        <i class="fas fa-long-arrow-alt-right text-teal-500"></i>
+                                                        <span class="text-[10px] px-2 py-1 bg-teal-50 rounded text-teal-700 font-bold">${m.to}</span>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 text-center font-black">${m.qty}</td>
+                                                <td class="px-6 py-4 text-right text-[10px] text-slate-400">
+                                                    ${m.createdAt?.toDate ? m.createdAt.toDate().toLocaleDateString('id-ID') : 'Pending'}
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
-            const box = document.getElementById('search-box');
-            box.oninput = () => {
-                const found = assets.find(a => a.nama.toLowerCase().includes(box.value.toLowerCase()) || a.kode === box.value);
-                if (found) showSearchDetail(found);
+
+            document.getElementById('mut-form').onsubmit = async (e) => {
+                e.preventDefault();
+                if (!user) return;
+
+                const aId = document.getElementById('m-asset').value;
+                const mQty = parseInt(document.getElementById('m-qty').value);
+                const mTo = document.getElementById('m-to').value;
+                const asset = assets.find(a => a.id === aId);
+
+                if (mQty > asset.qty) return alert("Stok tidak mencukupi!");
+                if (mTo === asset.room) return alert("Tujuan tidak boleh sama dengan lokasi asal!");
+
+                try {
+                    // Update original asset
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', aId), {
+                        qty: asset.qty - mQty
+                    });
+
+                    // Update or create in target room
+                    const existingInTarget = assets.find(a => a.name === asset.name && a.room === mTo && a.brand === asset.brand);
+                    if (existingInTarget) {
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', existingInTarget.id), {
+                            qty: existingInTarget.qty + mQty
+                        });
+                    } else {
+                        const newAsset = { ...asset };
+                        delete newAsset.id;
+                        newAsset.room = mTo;
+                        newAsset.qty = mQty;
+                        newAsset.createdAt = serverTimestamp();
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), newAsset);
+                    }
+
+                    // Log mutation
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), {
+                        assetId: aId,
+                        assetName: asset.name,
+                        from: asset.room,
+                        to: mTo,
+                        qty: mQty,
+                        note: document.getElementById('m-note').value,
+                        createdAt: serverTimestamp()
+                    });
+
+                    alert("Mutasi berhasil!");
+                    renderMutasi(container);
+                } catch (err) {
+                    alert("Gagal: " + err.message);
+                }
             };
-        };
+        }
 
-        const showSearchDetail = (a) => {
-            const res = document.getElementById('res-detail');
-            res.classList.remove('hidden');
-            res.innerHTML = `<div class="card-glass p-8 rounded-3xl">
-                <img src="${a.foto}" class="w-full h-48 object-cover rounded-2xl mb-4">
-                <h3 class="text-xl font-bold">${a.nama}</h3>
-                <p>${a.merk} - ${a.lokasi}</p>
-            </div>`;
-        };
-
-        const renderRuangan = (container) => {
+        function renderRuangan(container) {
             container.innerHTML = `
-                <div class="card-glass p-6 rounded-3xl mb-8 flex gap-4">
-                    <select id="sel-ruang" class="flex-1 p-3 bg-gray-50 rounded-xl">
-                        <option value="">Semua Ruangan</option>
-                        ${rooms.map(r => `<option value="${r.nama}">${r.nama}</option>`).join('')}
-                    </select>
-                    <button id="btn-print" class="bg-teal-600 text-white px-6 rounded-xl font-bold">Cetak PDF (Landscape F4)</button>
+                <div class="space-y-6">
+                    <div class="card-glass p-6 flex flex-wrap gap-4 items-center justify-between">
+                        <div class="flex gap-4 items-center">
+                            <label class="text-xs font-bold text-slate-500">FILTER RUANGAN:</label>
+                            <select id="room-filter" class="p-3 bg-slate-50 border rounded-xl outline-none text-sm font-bold min-w-[200px]">
+                                <option value="">SEMUA RUANGAN</option>
+                                ${rooms.map(r => `<option value="${r.name}">${r.name.toUpperCase()}</option>`).join('')}
+                            </select>
+                        </div>
+                        <button id="pdf-btn" class="bg-teal-700 text-white px-8 py-3 rounded-xl font-bold hover:bg-teal-800 flex items-center gap-2">
+                            <i class="fas fa-file-pdf"></i> CETAK LAPORAN (F4 LANDSCAPE)
+                        </button>
+                    </div>
+
+                    <div id="room-asset-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <!-- Assets grid here -->
+                    </div>
                 </div>
-                <div id="asset-grid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
             `;
-            const sel = document.getElementById('sel-ruang');
-            const grid = document.getElementById('asset-grid');
+
+            const grid = document.getElementById('room-asset-grid');
+            const filter = document.getElementById('room-filter');
+
             const updateGrid = () => {
-                const filtered = sel.value ? assets.filter(a => a.lokasi === sel.value) : assets;
+                const val = filter.value;
+                const filtered = val ? assets.filter(a => a.room === val) : assets;
+                
                 grid.innerHTML = filtered.map(a => `
-                    <div class="card-glass rounded-3xl overflow-hidden p-4" onclick="openAssetPreview('${a.id}')">
-                        <img src="${a.foto}" class="w-full h-32 object-cover rounded-xl mb-3">
-                        <p class="font-bold">${a.nama}</p>
-                        <p class="text-xs text-gray-400">${a.kode || '-'}</p>
+                    <div onclick="showAssetDetail('${a.id}')" class="card-glass overflow-hidden group cursor-pointer hover:scale-[1.02] transition-all duration-300">
+                        <div class="h-40 bg-slate-100 overflow-hidden relative">
+                            ${a.image ? `<img src="${a.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-300"><i class="fas fa-box text-4xl"></i></div>`}
+                            <div class="absolute top-2 right-2 px-2 py-1 bg-teal-600 text-white text-[10px] font-black rounded-lg">${a.qty} UNIT</div>
+                        </div>
+                        <div class="p-4">
+                            <p class="text-[10px] font-bold text-teal-600 uppercase mb-1">${a.room}</p>
+                            <h5 class="font-bold text-slate-800 leading-tight mb-1 group-hover:text-teal-700 transition">${a.name}</h5>
+                            <p class="text-[10px] text-slate-400 font-mono">${a.sn || 'No SN'}</p>
+                        </div>
                     </div>
                 `).join('');
             };
-            sel.onchange = updateGrid;
+
+            filter.onchange = updateGrid;
             updateGrid();
-            document.getElementById('btn-print').onclick = () => exportToPDF(sel.value);
-        };
 
-        window.openAssetPreview = (id) => {
+            document.getElementById('pdf-btn').onclick = () => exportToPDF(filter.value);
+        }
+
+        window.showAssetDetail = (id) => {
             const a = assets.find(x => x.id === id);
-            const modalBody = document.getElementById('modal-body');
-            modalBody.innerHTML = `
-                <div class="flex gap-6">
-                    <img src="${a.foto}" class="w-1/2 rounded-3xl">
-                    <div>
-                        <h2 class="text-2xl font-bold">${a.nama}</h2>
-                        <p>${a.merk} [${a.lokasi}]</p>
-                        <p class="mt-4">Stok: ${a.jumlah}</p>
+            const modal = document.getElementById('modal-container');
+            const body = document.getElementById('modal-content');
+            
+            body.innerHTML = `
+                <div class="flex flex-col md:flex-row gap-8">
+                    <div class="w-full md:w-1/2 space-y-4">
+                        <div class="aspect-square bg-slate-100 rounded-3xl overflow-hidden border">
+                            ${a.image ? `<img src="${a.image}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-slate-200"><i class="fas fa-box text-6xl"></i></div>`}
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div class="p-3 bg-slate-50 rounded-2xl text-center">
+                                <p class="text-[8px] font-bold text-slate-400 uppercase">Kuantitas</p>
+                                <p class="font-black text-slate-800">${a.qty} Unit</p>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded-2xl text-center">
+                                <p class="text-[8px] font-bold text-slate-400 uppercase">Harga Satuan</p>
+                                <p class="font-black text-slate-800">Rp ${a.price?.toLocaleString('id-ID') || '0'}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-1/2 space-y-6">
+                        <div>
+                            <p class="text-[10px] font-black text-teal-600 uppercase tracking-widest">${a.room}</p>
+                            <h2 class="text-3xl font-black text-slate-800 tracking-tighter">${a.name}</h2>
+                            <p class="text-slate-500 font-medium">${a.brand}</p>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-xs text-slate-400">Kode Inventaris</span>
+                                <span class="text-xs font-mono font-bold">${a.sn || '-'}</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-xs text-slate-400">Tgl Perolehan</span>
+                                <span class="text-xs font-bold">${a.date || '-'}</span>
+                            </div>
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="text-xs text-slate-400">Vendor / Supplier</span>
+                                <span class="text-xs font-bold">${a.vendor || '-'}</span>
+                            </div>
+                        </div>
+                        <div class="pt-4 flex gap-2">
+                            <button onclick="editAsset('${a.id}'); closeModal();" class="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition">EDIT DATA</button>
+                            <button onclick="closeModal()" class="px-6 py-3 border border-slate-200 rounded-xl font-bold hover:bg-slate-50 transition">TUTUP</button>
+                        </div>
                     </div>
                 </div>
             `;
-            document.getElementById('modal-overlay').style.display = 'flex';
+            modal.style.display = 'flex';
         };
 
-        const renderInputMutasi = (container) => {
+        window.closeModal = () => {
+            document.getElementById('modal-container').style.display = 'none';
+        };
+
+        function renderSettings(container) {
             container.innerHTML = `
-                <div class="max-w-xl mx-auto">
-                    <form id="form-mutasi" class="card-glass p-8 rounded-3xl space-y-4">
-                        <select id="mut-aset" required class="w-full p-4 bg-gray-50 rounded-2xl">
-                            <option value="">Pilih Barang...</option>
-                            ${assets.map(a => `<option value="${a.id}">${a.nama} (Stok: ${a.jumlah})</option>`).join('')}
-                        </select>
-                        <select id="mut-tipe" class="w-full p-4 bg-gray-50 rounded-2xl">
-                            <option value="Mutasi">Mutasi Ruangan</option>
-                            <option value="Rusak">Rusak</option>
-                            <option value="Dipinjam">Dipinjam</option>
-                        </select>
-                        <input type="number" id="mut-qty" required placeholder="Jumlah" class="w-full p-4 bg-gray-50 rounded-2xl">
-                        <select id="mut-ke" class="w-full p-4 bg-gray-50 rounded-2xl">
-                            <option value="">Pilih Tujuan...</option>
-                            ${rooms.map(r => `<option value="${r.nama}">${r.nama}</option>`).join('')}
-                        </select>
-                        <textarea id="mut-ket" placeholder="Keterangan" class="w-full p-4 bg-gray-50 rounded-2xl"></textarea>
-                        <button type="submit" class="w-full bg-teal-600 text-white font-bold py-4 rounded-2xl">Proses</button>
-                    </form>
+                <div class="max-w-2xl mx-auto space-y-8">
+                    <div class="card-glass p-8">
+                        <h4 class="font-black text-slate-800 uppercase tracking-tighter mb-6">Manajemen Ruangan</h4>
+                        <div class="flex gap-4 mb-6">
+                            <input type="text" id="new-room-name" placeholder="Nama Ruangan..." class="flex-1 p-3 border rounded-xl outline-none focus:ring-2 focus:ring-teal-100">
+                            <button id="add-room-btn" class="bg-teal-600 text-white px-6 rounded-xl font-bold hover:bg-teal-700 transition">TAMBAH</button>
+                        </div>
+                        <div class="bg-slate-50 rounded-2xl overflow-hidden border">
+                            <table class="w-full text-left">
+                                <thead class="bg-white text-[10px] font-black text-slate-400 uppercase border-b">
+                                    <tr>
+                                        <th class="px-6 py-3">Nama Ruangan</th>
+                                        <th class="px-6 py-3 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y">
+                                    ${rooms.map(r => `
+                                        <tr class="hover:bg-white transition">
+                                            <td class="px-6 py-4 font-bold text-slate-700">${r.name}</td>
+                                            <td class="px-6 py-4 text-right">
+                                                <button onclick="deleteRoom('${r.id}')" class="text-red-500 hover:text-red-700 p-2"><i class="fas fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             `;
-            document.getElementById('form-mutasi').onsubmit = async (e) => {
-                e.preventDefault();
-                const aId = document.getElementById('mut-aset').value;
-                const a = assets.find(x => x.id === aId);
-                const qty = parseInt(document.getElementById('mut-qty').value);
-                const tipe = document.getElementById('mut-tipe').value;
-                const ke = document.getElementById('mut-ke').value;
-                
-                if (qty > a.jumlah) return alert("Stok kurang!");
 
-                // Update original stock
-                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', aId), { jumlah: a.jumlah - qty });
-                
-                if (tipe === 'Mutasi') {
-                    const exist = assets.find(x => x.nama === a.nama && x.lokasi === ke);
-                    if (exist) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', exist.id), { jumlah: exist.jumlah + qty });
-                    else await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), { ...a, id: undefined, lokasi: ke, jumlah: qty });
-                }
-
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), {
-                    namaBarang: a.nama, tipe, jumlah: qty, dari: a.lokasi, ke, createdAt: serverTimestamp()
-                });
-                switchTab('db-mutasi');
+            document.getElementById('add-room-btn').onclick = async () => {
+                if (!user) return;
+                const name = document.getElementById('new-room-name').value;
+                if (name) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { name });
             };
-        };
-
-        const renderDBMutasi = (container) => {
-            container.innerHTML = `
-                <div class="card-glass rounded-3xl overflow-hidden">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-100"><tr><th class="p-4">Barang</th><th class="p-4">Tipe</th><th class="p-4">Rute</th><th class="p-4">Qty</th></tr></thead>
-                        <tbody class="divide-y">
-                            ${mutations.map(m => `<tr><td class="p-4">${m.namaBarang}</td><td class="p-4">${m.tipe}</td><td class="p-4">${m.dari} → ${m.ke}</td><td class="p-4 font-bold">${m.jumlah}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        };
-
-        const renderImportExport = (container) => {
-            container.innerHTML = `<div class="text-center p-20 card-glass rounded-3xl">
-                <button onclick="exportToExcel()" class="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-bold">Export Excel</button>
-            </div>`;
-        };
-
-        window.exportToExcel = () => {
-            const ws = XLSX.utils.json_to_sheet(assets.map(({id, foto, ...r}) => r));
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Aset");
-            XLSX.writeFile(wb, "SIMARS_Asset.xlsx");
-        };
-
-        const renderMasterRuangan = (container) => {
-            container.innerHTML = `
-                <div class="max-w-xl mx-auto space-y-6">
-                    <div class="card-glass p-8 rounded-3xl flex gap-4">
-                        <input type="text" id="new-room" placeholder="Nama Ruangan..." class="flex-1 p-4 bg-gray-50 rounded-2xl outline-none">
-                        <button onclick="addRoom()" class="bg-teal-600 text-white px-6 rounded-2xl font-bold">Tambah</button>
-                    </div>
-                    <div class="card-glass rounded-3xl overflow-hidden divide-y">
-                        ${rooms.map(r => `<div class="p-4 flex justify-between"><span>${r.nama}</span><button onclick="deleteRoom('${r.id}')" class="text-red-500"><i class="fas fa-trash"></i></button></div>`).join('')}
-                    </div>
-                </div>
-            `;
-        };
-
-        window.addRoom = async () => {
-            const n = document.getElementById('new-room').value;
-            if (n) await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { nama: n });
-        };
+        }
 
         window.deleteRoom = async (id) => {
-            if (confirm("Hapus?")) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
+            if (!user) return;
+            if (confirm("Hapus ruangan ini? Aset yang terkait mungkin akan kehilangan data lokasinya.")) {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
+            }
         };
 
-        // --- EXPORT PDF CUSTOMIZED ---
+        // EXPORT LOGIC
+        window.exportToExcel = () => {
+            const data = assets.map(a => ({
+                'Nama Barang': a.name,
+                'Merk/Tipe': a.brand,
+                'Serial Number': a.sn,
+                'Jumlah': a.qty,
+                'Ruangan': a.room,
+                'Harga Satuan': a.price,
+                'Tanggal Beli': a.date,
+                'Vendor': a.vendor
+            }));
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Inventaris");
+            XLSX.writeFile(wb, "SIMARS_Inventaris_Full.xlsx");
+        };
+
         const exportToPDF = (roomName) => {
             const { jsPDF } = window.jspdf;
             
-            // F4 Size: 215.9mm x 330.2mm
+            // F4 Landscape: 330.2mm x 215.9mm
             const doc = new jsPDF({
                 orientation: 'landscape',
                 unit: 'mm',
                 format: [215.9, 330.2]
             });
 
-            const data = roomName ? assets.filter(a => a.lokasi === roomName) : assets;
+            const data = roomName ? assets.filter(a => a.room === roomName) : assets;
             
-            // Kop Rumah Sakit
+            // Header
             doc.setFontSize(18);
-            doc.setTextColor(13, 148, 136);
-            doc.text("RUMAH SAKIT UMUM DAERAH SIMARS", 165, 15, { align: 'center' });
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text("Jl. Kesehatan No. 1, Kota Madya, Indonesia • Telp: (021) 555-0123", 165, 20, { align: 'center' });
+            doc.setFont("helvetica", "bold");
+            doc.text("LAPORAN DAFTAR INVENTARIS ASET", 165.1, 15, { align: 'center' });
+            
+            doc.setFontSize(12);
+            doc.text(`RUANGAN: ${roomName ? roomName.toUpperCase() : 'SEMUA RUANGAN'}`, 165.1, 22, { align: 'center' });
+            
+            doc.setLineWidth(0.5);
             doc.line(20, 25, 310, 25);
 
-            // Judul Laporan
-            doc.setFontSize(14);
-            doc.setTextColor(0);
-            doc.text(`LAPORAN INVENTARIS ASET: ${roomName ? roomName.toUpperCase() : 'SEMUA RUANGAN'}`, 20, 35);
-
-            // Mapping Data: No, Nama, Merk, SN, Tahun Beli, Qty
-            const tableData = data.map((a, i) => {
+            // Table Data Preparation: No, Nama, Merk, SN/Kode, Tahun Beli, Qty
+            const tableRows = data.map((a, i) => {
                 let tahun = '-';
-                if (a.tanggal) {
-                    const dt = new Date(a.tanggal);
-                    tahun = dt.getFullYear();
+                if (a.date) {
+                    const d = new Date(a.date);
+                    tahun = !isNaN(d.getFullYear()) ? d.getFullYear() : '-';
                 }
                 return [
-                    i + 1, 
-                    a.nama, 
-                    a.merk, 
-                    a.kode || '-', 
+                    i + 1,
+                    a.name,
+                    a.brand,
+                    a.sn || '-',
                     tahun,
-                    a.jumlah
+                    a.qty
                 ];
             });
 
             doc.autoTable({
-                startY: 45,
-                head: [['No', 'Nama Barang', 'Merk / Tipe', 'Kode Inventaris / SN', 'Tahun Beli', 'Qty']],
-                body: tableData,
+                startY: 30,
+                head: [['NO', 'NAMA BARANG', 'MERK / TIPE', 'KODE INV / SN', 'TAHUN BELI', 'QTY']],
+                body: tableRows,
                 theme: 'grid',
-                headStyles: { fillColor: [13, 148, 136], halign: 'center' },
+                headStyles: { fillColor: [15, 118, 110], halign: 'center' },
                 styles: { fontSize: 9, cellPadding: 3 },
                 columnStyles: {
                     0: { halign: 'center', cellWidth: 15 },
+                    1: { cellWidth: 80 },
+                    2: { cellWidth: 60 },
                     4: { halign: 'center', cellWidth: 30 },
                     5: { halign: 'center', cellWidth: 20 }
-                }
+                },
+                margin: { left: 20, right: 20 }
             });
 
-            // Footer / Tanda Tangan
+            // Footer (Signatures)
             const finalY = doc.lastAutoTable.finalY + 15;
-            const tglStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-
-            // Kolom Kiri: Pencatat
-            doc.text("Pencatat Barang,", 40, finalY);
-            doc.text("( __________________________ )", 40, finalY + 25);
+            const today = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
             
-            // Kolom Kanan: Penanggung Jawab
-            doc.text(`Dibuat di Kota Madya, ${tglStr}`, 230, finalY - 5); // Tanggal Cetak diletakkan diatas ttd
-            doc.text("Penanggung Jawab Ruangan,", 230, finalY);
-            doc.text("( __________________________ )", 230, finalY + 25);
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
 
-            doc.save(`SIMARS_Laporan_${roomName || 'Semua'}_${Date.now()}.pdf`);
+            // Left Side
+            doc.text("Pencatat Barang,", 40, finalY + 10);
+            doc.text("( __________________________ )", 40, finalY + 35);
+            
+            // Right Side
+            // Tanggal Cetak diletakkan diatas tanda tangan penanggung jawab
+            doc.text(`Dicetak pada: ${today}`, 230, finalY);
+            doc.text("Penanggung Jawab Ruangan,", 230, finalY + 10);
+            doc.text("( __________________________ )", 230, finalY + 35);
+
+            doc.save(`Laporan_Aset_${roomName || 'Semua'}_${Date.now()}.pdf`);
         };
 
-        window.closeModal = () => document.getElementById('modal-overlay').style.display = 'none';
-
+        // Start App
         initAuth();
         switchTab('dashboard');
+
+        // Utils
+        const updateDateText = () => {
+            const now = new Date();
+            document.getElementById('current-date-text').innerText = `Waktu Server: ${now.toLocaleDateString('id-ID')} ${now.toLocaleTimeString('id-ID')}`;
+        };
+        setInterval(updateDateText, 1000);
+        updateDateText();
+
     </script>
 </body>
 </html>
