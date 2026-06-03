@@ -1074,7 +1074,6 @@
             }
         };
 
-        // --- Berita Acara Kerusakan Aset Tab ---
         const renderBeritaAcara = (container) => {
             container.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
@@ -1190,6 +1189,7 @@
                     kode: asset.kode || '-',
                     lokasi: asset.lokasi,
                     tanggal: document.getElementById('ba-tanggal').value,
+                    tanggalBeli: asset.tanggal || '-', // Otomatis mengambil tanggal pembelian langsung dari database aset
                     jenisKerusakan: document.getElementById('ba-jenis-kerusakan').value,
                     detail: document.getElementById('ba-detail').value,
                     signKepala: document.getElementById('ba-sign-kepala').value,
@@ -1218,7 +1218,7 @@
             const mut = mutations.find(m => m.id === mutationId);
             if (!mut) return;
 
-            const asset = assets.find(a => a.id === mut.assetId) || { kode: '-' };
+            const asset = assets.find(a => a.id === mut.assetId) || { kode: '-', tanggal: '-' };
             
             const reportData = {
                 nama: mut.namaBarang,
@@ -1226,6 +1226,7 @@
                 kode: asset.kode || '-',
                 lokasi: mut.dari,
                 tanggal: mut.tanggalMutasi || new Date().toISOString().split('T')[0],
+                tanggalBeli: asset.tanggal || '-',
                 jenisKerusakan: "Rusak (Melalui Riwayat)",
                 detail: mut.keterangan || "Dilaporkan melalui manajemen mutasi.",
                 signKepala: "Siti Rahmawati, S.Kep.",
@@ -1242,18 +1243,18 @@
 
             // --- KOP SURAT RSU DADI KELUARGA ---
             doc.setFontSize(22);
-            doc.setTextColor(13, 148, 136); // Teal
-            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 51, 204); // Blue color (Royal Blue)
+            doc.setFont("times", "bold");
             doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 18, { align: 'center' });
             
             doc.setFontSize(9);
-            doc.setTextColor(100);
-            doc.setFont("helvetica", "normal");
+            doc.setTextColor(0, 51, 204); // Blue color matching subheader
+            doc.setFont("times", "normal");
             doc.text("Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan, Kab. Banyumas", 105, 23, { align: 'center' });
             doc.text("Telp: (0281) 6844005 • Email: info@rsudadikeluarga.co.id • Purwokerto 53145", 105, 27, { align: 'center' });
             
-            // Double divider line
-            doc.setDrawColor(13, 148, 136);
+            // Double divider line in blue color
+            doc.setDrawColor(0, 51, 204);
             doc.setLineWidth(0.8);
             doc.line(15, 30, 195, 30);
             doc.setLineWidth(0.2);
@@ -1279,14 +1280,26 @@
             // --- TABEL DETAIL BARANG ---
             const daysArr = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
             const monthsArr = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            
             const dateObj = new Date(data.tanggal);
             const dayName = daysArr[dateObj.getDay()] || "-";
             const formattedDateStr = `${dayName}, ${dateObj.getDate()} ${monthsArr[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+
+            let formattedBeliStr = "-";
+            if (data.tanggalBeli && data.tanggalBeli !== "-") {
+                const dateBeliObj = new Date(data.tanggalBeli);
+                if (!isNaN(dateBeliObj)) {
+                    formattedBeliStr = `${dateBeliObj.getDate()} ${monthsArr[dateBeliObj.getMonth()]} ${dateBeliObj.getFullYear()}`;
+                } else {
+                    formattedBeliStr = data.tanggalBeli;
+                }
+            }
 
             const detailTableRows = [
                 ["Nama Aset / Alat", data.nama],
                 ["Merk / Tipe", data.merk],
                 ["Kode Inventaris / SN", data.kode],
+                ["Tanggal Pembelian Alat", formattedBeliStr],
                 ["Lokasi / Ruangan", data.lokasi],
                 ["Tanggal Temuan Kerusakan", formattedDateStr],
                 ["Klasifikasi Kerusakan", data.jenisKerusakan],
