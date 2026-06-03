@@ -148,6 +148,9 @@
                 <button onclick="switchTab('db-mutasi')" id="nav-db-mutasi" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
                     <i class="fas fa-history w-5"></i> Riwayat Mutasi
                 </button>
+                <button onclick="switchTab('berita-acara')" id="nav-berita-acara" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
+                    <i class="fas fa-file-signature w-5"></i> BA Kerusakan
+                </button>
 
                 <p class="text-[10px] uppercase tracking-widest text-teal-400 font-bold mt-6 mb-2 ml-2">Pengaturan</p>
                 <button onclick="switchTab('import-export')" id="nav-import-export" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
@@ -286,6 +289,7 @@
                 'ruangan': 'Manajemen Aset Ruangan',
                 'input-mutasi': 'Mutasi & Perubahan Status',
                 'db-mutasi': 'Riwayat Mutasi Aset',
+                'berita-acara': 'Berita Acara Kerusakan Aset',
                 'import-export': 'Import & Export Excel',
                 'master-ruangan': 'Master Ruangan'
             };
@@ -306,6 +310,7 @@
                 case 'ruangan': renderRuangan(container); break;
                 case 'input-mutasi': renderInputMutasi(container); break;
                 case 'db-mutasi': renderDBMutasi(container); break;
+                case 'berita-acara': renderBeritaAcara(container); break;
                 case 'import-export': renderImportExport(container); break;
                 case 'master-ruangan': renderMasterRuangan(container); break;
             }
@@ -1049,8 +1054,9 @@
                                             </div>
                                         </td>
                                         <td class="px-6 py-4 text-center font-bold">${m.jumlah}</td>
-                                        <td class="px-6 py-4 text-right">
-                                            <button onclick="deleteMutation('${m.id}')" class="text-red-400 hover:text-red-600 transition"><i class="fas fa-trash"></i></button>
+                                        <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
+                                            ${m.tipe === 'Rusak' ? `<button onclick="cetakBaKerusakanLangsung('${m.id}')" class="bg-teal-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-teal-700 transition" title="Cetak Berita Acara"><i class="fas fa-print"></i> BA</button>` : ''}
+                                            <button onclick="deleteMutation('${m.id}')" class="text-red-400 hover:text-red-600 transition p-2"><i class="fas fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -1066,6 +1072,275 @@
                 await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id));
                 showToast("Catatan mutasi dihapus");
             }
+        };
+
+        // --- Berita Acara Kerusakan Aset Tab ---
+        const renderBeritaAcara = (container) => {
+            container.innerHTML = `
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                    <!-- Form Generator -->
+                    <div class="lg:col-span-1">
+                        <form id="form-ba-rusak" class="card-glass p-6 rounded-[2rem] space-y-4">
+                            <h4 class="font-bold text-teal-900 border-b pb-2 mb-4"><i class="fas fa-print mr-2"></i>Buat Berita Acara</h4>
+                            
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-700">Pilih Aset Terdaftar <span class="text-red-500">*</span></label>
+                                <select id="ba-asset-id" required class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                                    <option value="">-- Pilih Aset --</option>
+                                    ${assets.map(a => `<option value="${a.id}">${a.nama} (${a.merk}) - [Kode: ${a.kode || 'N/A'}]</option>`).join('')}
+                                </select>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-700">Tanggal Temuan Kerusakan <span class="text-red-500">*</span></label>
+                                <input type="date" id="ba-tanggal" required class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-700">Jenis/Klasifikasi Kerusakan <span class="text-red-500">*</span></label>
+                                <select id="ba-jenis-kerusakan" required class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
+                                    <option value="Rusak Ringan">Rusak Ringan (Bisa Diperbaiki Cepat)</option>
+                                    <option value="Rusak Sedang">Rusak Sedang (Perlu Suku Cadang)</option>
+                                    <option value="Rusak Berat / Total">Rusak Berat / Total (Tidak Layak Pakai)</option>
+                                </select>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-700">Kronologi & Detail Kerusakan <span class="text-red-500">*</span></label>
+                                <textarea id="ba-detail" required rows="3" placeholder="Sebutkan kendala teknis / kronologi..." class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm"></textarea>
+                            </div>
+
+                            <p class="text-[10px] uppercase tracking-widest text-teal-700 font-bold mt-2">Daftar Penandatangan</p>
+
+                            <div class="space-y-1">
+                                <label class="text-[11px] font-bold text-gray-600">Kepala Ruang (Penanggung Jawab)</label>
+                                <input type="text" id="ba-sign-kepala" required value="Siti Rahmawati, S.Kep." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-xs">
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-[11px] font-bold text-gray-600">Koordinator Rumah Tangga</label>
+                                <input type="text" id="ba-sign-koor" required value="Adi Wijaya, S.E." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-xs">
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-[11px] font-bold text-gray-600">Manager Umum</label>
+                                <input type="text" id="ba-sign-manager" required value="dr. H. Tomos Junior, M.M." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-xs">
+                            </div>
+
+                            <button type="submit" class="w-full bg-teal-600 text-white font-bold py-3 rounded-xl hover:bg-teal-700 transition active:scale-[0.98] shadow-lg shadow-teal-100 flex items-center justify-center gap-2 text-sm">
+                                <i class="fas fa-file-pdf"></i> Cetak Berita Acara PDF
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- DB Damage Listings -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="card-glass p-6 rounded-[2rem]">
+                            <h4 class="font-bold text-gray-800 mb-4"><i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>Aset Rusak Terdaftar di Database</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-xs">
+                                    <thead>
+                                        <tr class="bg-gray-100 text-gray-700">
+                                            <th class="p-3">Tanggal Lapor</th>
+                                            <th class="p-3">Nama Alat</th>
+                                            <th class="p-3">Kode/SN</th>
+                                            <th class="p-3">Lokasi</th>
+                                            <th class="p-3 text-center">Cetak</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100">
+                                        ${mutations.filter(m => m.tipe === 'Rusak').length === 0 ? '<tr><td colspan="5" class="p-8 text-center text-gray-400">Belum ada riwayat kerusakan dilaporkan di mutasi.</td></tr>' : 
+                                          mutations.filter(m => m.tipe === 'Rusak').map(m => {
+                                            const originalAsset = assets.find(a => a.id === m.assetId) || {};
+                                            return `
+                                                <tr class="hover:bg-teal-50/20 transition">
+                                                    <td class="p-3 text-gray-500">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
+                                                    <td class="p-3 font-bold text-gray-800">${m.namaBarang}</td>
+                                                    <td class="p-3 font-mono">${originalAsset.kode || '-'}</td>
+                                                    <td class="p-3"><span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-bold text-[9px]">${m.dari}</span></td>
+                                                    <td class="p-3 text-center">
+                                                        <button onclick="pilihAsetRusakUntukCetak('${m.id}')" class="bg-teal-100 text-teal-800 px-3 py-1 rounded-lg hover:bg-teal-200 transition font-bold text-[10px]">
+                                                            Gunakan Data
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            `;
+                                          }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Default values
+            document.getElementById('ba-tanggal').value = new Date().toISOString().split('T')[0];
+
+            document.getElementById('form-ba-rusak').onsubmit = (e) => {
+                e.preventDefault();
+                const assetId = document.getElementById('ba-asset-id').value;
+                const asset = assets.find(a => a.id === assetId);
+                
+                if (!asset) return showToast("Pilih aset terlebih dahulu!", "warning");
+
+                const reportData = {
+                    nama: asset.nama,
+                    merk: asset.merk,
+                    kode: asset.kode || '-',
+                    lokasi: asset.lokasi,
+                    tanggal: document.getElementById('ba-tanggal').value,
+                    jenisKerusakan: document.getElementById('ba-jenis-kerusakan').value,
+                    detail: document.getElementById('ba-detail').value,
+                    signKepala: document.getElementById('ba-sign-kepala').value,
+                    signKoor: document.getElementById('ba-sign-koor').value,
+                    signManager: document.getElementById('ba-sign-manager').value
+                };
+
+                exportBeritaAcaraPDF(reportData);
+            };
+        };
+
+        window.pilihAsetRusakUntukCetak = (mutationId) => {
+            const mut = mutations.find(m => m.id === mutationId);
+            if (!mut) return;
+
+            const asset = assets.find(a => a.id === mut.assetId);
+            if (asset) {
+                document.getElementById('ba-asset-id').value = asset.id;
+            }
+            document.getElementById('ba-tanggal').value = mut.tanggalMutasi || new Date().toISOString().split('T')[0];
+            document.getElementById('ba-detail').value = mut.keterangan || "";
+            showToast("Data dari database berhasil dimuat! Silakan tinjau kembali sebelum cetak.");
+        };
+
+        window.cetakBaKerusakanLangsung = (mutationId) => {
+            const mut = mutations.find(m => m.id === mutationId);
+            if (!mut) return;
+
+            const asset = assets.find(a => a.id === mut.assetId) || { kode: '-' };
+            
+            const reportData = {
+                nama: mut.namaBarang,
+                merk: mut.merk,
+                kode: asset.kode || '-',
+                lokasi: mut.dari,
+                tanggal: mut.tanggalMutasi || new Date().toISOString().split('T')[0],
+                jenisKerusakan: "Rusak (Melalui Riwayat)",
+                detail: mut.keterangan || "Dilaporkan melalui manajemen mutasi.",
+                signKepala: "Siti Rahmawati, S.Kep.",
+                signKoor: "Adi Wijaya, S.E.",
+                signManager: "dr. H. Tomos Junior, M.M."
+            };
+
+            exportBeritaAcaraPDF(reportData);
+        };
+
+        const exportBeritaAcaraPDF = (data) => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            // --- KOP SURAT RSU DADI KELUARGA ---
+            doc.setFontSize(22);
+            doc.setTextColor(13, 148, 136); // Teal
+            doc.setFont("helvetica", "bold");
+            doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 18, { align: 'center' });
+            
+            doc.setFontSize(9);
+            doc.setTextColor(100);
+            doc.setFont("helvetica", "normal");
+            doc.text("Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan, Kab. Banyumas", 105, 23, { align: 'center' });
+            doc.text("Telp: (0281) 6844005 • Email: info@rsudadikeluarga.co.id • Purwokerto 53145", 105, 27, { align: 'center' });
+            
+            // Double divider line
+            doc.setDrawColor(13, 148, 136);
+            doc.setLineWidth(0.8);
+            doc.line(15, 30, 195, 30);
+            doc.setLineWidth(0.2);
+            doc.line(15, 31.2, 195, 31.2);
+
+            // --- JUDUL DOKUMEN ---
+            doc.setFontSize(14);
+            doc.setTextColor(0);
+            doc.setFont("helvetica", "bold");
+            doc.text("BERITA ACARA KERUSAKAN ASET NON-MEDIS", 105, 42, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            const rawYear = new Date(data.tanggal).getFullYear() || 2026;
+            const randomDocNo = Math.floor(Math.random() * 800) + 100;
+            doc.text(`Nomor: BA-RSDK/UM-RT/${rawYear}/${randomDocNo}`, 105, 47, { align: 'center' });
+
+            // --- KATA PENGANTAR ---
+            doc.setFontSize(10);
+            doc.text("Yang bertanda tangan di bawah ini menerangkan dengan sebenarnya mengenai kondisi kerusakan fisik", 15, 58);
+            doc.text("aset rumah sakit non-medis yang tertera di bawah ini:", 15, 63);
+
+            // --- TABEL DETAIL BARANG ---
+            const daysArr = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+            const monthsArr = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const dateObj = new Date(data.tanggal);
+            const dayName = daysArr[dateObj.getDay()] || "-";
+            const formattedDateStr = `${dayName}, ${dateObj.getDate()} ${monthsArr[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+
+            const detailTableRows = [
+                ["Nama Aset / Alat", data.nama],
+                ["Merk / Tipe", data.merk],
+                ["Kode Inventaris / SN", data.kode],
+                ["Lokasi / Ruangan", data.lokasi],
+                ["Tanggal Temuan Kerusakan", formattedDateStr],
+                ["Klasifikasi Kerusakan", data.jenisKerusakan],
+                ["Deskripsi & Kronologi Kerusakan", data.detail]
+            ];
+
+            doc.autoTable({
+                startY: 68,
+                margin: { left: 15, right: 15 },
+                body: detailTableRows,
+                theme: 'grid',
+                styles: { fontSize: 10, cellPadding: 4 },
+                columnStyles: {
+                    0: { cellWidth: 55, fontStyle: 'bold', fillColor: [243, 244, 246] },
+                    1: { cellWidth: 125 }
+                }
+            });
+
+            // --- KATA PENUTUP ---
+            const finalTableY = doc.lastAutoTable.finalY;
+            doc.setFontSize(10);
+            doc.text("Demikian Berita Acara Kerusakan ini dibuat dengan sebenar-benarnya untuk digunakan sebagai landasan", 15, finalTableY + 12);
+            doc.text("tindak lanjut perbaikan atau pengajuan penggantian aset sesuai regulasi sarana prasarana RSU Dadi Keluarga.", 15, finalTableY + 17);
+
+            // --- TANDA TANGAN (SIGNATURE LAYOUT) ---
+            const sigY = finalTableY + 32;
+
+            // Header Signatures
+            doc.setFont("helvetica", "normal");
+            doc.text("Mengetahui,", 105, sigY, { align: 'center' });
+            
+            doc.text("Melaporkan,", 35, sigY + 6, { align: 'center' });
+            doc.setFont("helvetica", "bold");
+            doc.text("Kepala Ruang", 35, sigY + 11, { align: 'center' });
+
+            doc.setFont("helvetica", "normal");
+            doc.text("Menyetujui,", 105, sigY + 6, { align: 'center' });
+            doc.setFont("helvetica", "bold");
+            doc.text("Koordinator Rumah Tangga", 105, sigY + 11, { align: 'center' });
+
+            doc.setFont("helvetica", "normal");
+            doc.text("Mengesahkan,", 170, sigY + 6, { align: 'center' });
+            doc.setFont("helvetica", "bold");
+            doc.text("Manager Umum", 170, sigY + 11, { align: 'center' });
+
+            // Space for hand-writing
+            const signLinesY = sigY + 38;
+            doc.setFont("helvetica", "bold");
+            doc.text(`( ${data.signKepala} )`, 35, signLinesY, { align: 'center' });
+            doc.text(`( ${data.signKoor} )`, 105, signLinesY, { align: 'center' });
+            doc.text(`( ${data.signManager} )`, 170, signLinesY, { align: 'center' });
+
+            doc.save(`Berita_Acara_Rusak_${data.nama.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+            showToast("Berita Acara Kerusakan berhasil dicetak!");
         };
 
         const renderImportExport = (container) => {
