@@ -209,13 +209,13 @@
 
         // Global State
         const firebaseConfig = {
-  apiKey: "AIzaSyAzlAn3taV7-WMDta-AQAewzDUaZzxvxAc",
-  authDomain: "inventarisnonalkes.firebaseapp.com",
-  projectId: "inventarisnonalkes",
-  storageBucket: "inventarisnonalkes.firebasestorage.app",
-  messagingSenderId: "212207980203",
-  appId: "1:212207980203:web:582396a405766aa21ab1ee"
-};
+          apiKey: "AIzaSyAzlAn3taV7-WMDta-AQAewzDUaZzxvxAc",
+          authDomain: "inventarisnonalkes.firebaseapp.com",
+          projectId: "inventarisnonalkes",
+          storageBucket: "inventarisnonalkes.firebasestorage.app",
+          messagingSenderId: "212207980203",
+          appId: "1:212207980203:web:582396a405766aa21ab1ee"
+        };
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
@@ -375,7 +375,7 @@
                                     <div class="flex-1 bg-gray-50/50 rounded-2xl p-4">
                                         <p class="text-sm font-bold text-gray-800">${m.namaBarang}</p>
                                         <p class="text-xs text-gray-600">${m.tipe}: ${m.dari} → ${m.ke}</p>
-                                        <p class="text-[10px] text-gray-400 mt-1">${new Date(m.createdAt?.seconds * 1000).toLocaleString()}</p>
+                                        <p class="text-[10px] text-gray-400 mt-1">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleString()}</p>
                                     </div>
                                 </div>
                             `).join('')}
@@ -701,7 +701,7 @@
             resultDiv.innerHTML = `
                 <div class="card-glass rounded-[2rem] overflow-hidden">
                     <div class="h-64 bg-gray-200 overflow-hidden relative">
-                        ${asset.foto ? `<img src="${asset.foto}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-gray-400 text-6xl"><i class="fas fa-image"></i></div>`}
+                        ${asset.foto ? `<img src="${asset.foto}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-gray-300 text-6xl"><i class="fas fa-image"></i></div>`}
                         <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 p-8 text-white">
                             <p class="text-xs font-bold uppercase tracking-widest text-teal-300">${asset.merk}</p>
                             <h3 class="text-3xl font-bold">${asset.nama}</h3>
@@ -745,7 +745,7 @@
                                     </tr>
                                     ${history.map(h => `
                                         <tr class="border-b">
-                                            <td class="p-3 text-gray-400">${new Date(h.createdAt?.seconds * 1000).toLocaleDateString()}</td>
+                                            <td class="p-3 text-gray-400">${h.tanggalMutasi ? new Date(h.tanggalMutasi).toLocaleDateString('id-ID') : new Date(h.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
                                             <td class="p-3">
                                                 <span class="px-2 py-0.5 ${h.tipe === 'Mutasi' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'} rounded-full font-bold">${h.tipe}</span>
                                             </td>
@@ -881,6 +881,11 @@
                             </select>
                         </div>
                         
+                        <div class="space-y-2">
+                            <label class="text-sm font-bold text-gray-700">Tanggal Mutasi <span class="text-red-500">*</span></label>
+                            <input type="date" id="mutasi-tanggal" required class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-gray-700">Jenis Perubahan Status</label>
@@ -916,6 +921,9 @@
                 </div>
             `;
 
+            // Set Tanggal Mutasi default ke tanggal hari ini
+            document.getElementById('mutasi-tanggal').value = new Date().toISOString().split('T')[0];
+
             const tipeSelect = document.getElementById('mutasi-tipe');
             const keContainer = document.getElementById('mutasi-ke-container');
             tipeSelect.onchange = () => {
@@ -932,6 +940,7 @@
                 const tipe = document.getElementById('mutasi-tipe').value;
                 const ke = document.getElementById('mutasi-ke').value;
                 const keterangan = document.getElementById('mutasi-keterangan').value;
+                const tanggalMutasi = document.getElementById('mutasi-tanggal').value;
 
                 if (jumlah > asset.jumlah) return showToast("Jumlah melebihi stok yang tersedia!", "warning");
                 if (tipe === 'Mutasi' && !ke) return showToast("Harap pilih ruangan tujuan!", "warning");
@@ -988,6 +997,7 @@
                         dari: asset.lokasi,
                         ke: tipe === 'Mutasi' ? ke : '-',
                         keterangan,
+                        tanggalMutasi: tanggalMutasi,
                         createdAt: serverTimestamp()
                     });
 
@@ -1021,7 +1031,7 @@
                                 ${mutations.length === 0 ? '<tr><td colspan="6" class="p-12 text-center text-gray-400">Belum ada riwayat mutasi.</td></tr>' : 
                                   mutations.map(m => `
                                     <tr class="hover:bg-teal-50/30 transition">
-                                        <td class="px-6 py-4 text-xs text-gray-500">${new Date(m.createdAt?.seconds * 1000).toLocaleString()}</td>
+                                        <td class="px-6 py-4 text-xs text-gray-500">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
                                         <td class="px-6 py-4">
                                             <p class="font-bold text-gray-800 text-sm">${m.namaBarang}</p>
                                             <p class="text-[10px] text-gray-400">${m.merk}</p>
