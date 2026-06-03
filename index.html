@@ -204,13 +204,29 @@
         </div>
     </div>
 
+    <!-- Kustom Modal Konfirmasi Modern -->
+    <div id="confirm-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-[110] no-print">
+        <div class="bg-white rounded-3xl p-6 max-w-sm w-full mx-4 shadow-2xl text-center space-y-6">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-2xl mx-auto">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="space-y-2">
+                <h4 class="font-bold text-gray-800 text-lg" id="confirm-title">Konfirmasi</h4>
+                <p class="text-sm text-gray-500" id="confirm-message">Apakah Anda yakin ingin melanjutkan tindakan ini?</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="btn-confirm-cancel" class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition text-sm">Batal</button>
+                <button id="btn-confirm-yes" class="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition text-sm">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase & Logic Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Global State
         const firebaseConfig = {
           apiKey: "AIzaSyAzlAn3taV7-WMDta-AQAewzDUaZzxvxAc",
           authDomain: "inventarisnonalkes.firebaseapp.com",
@@ -229,6 +245,29 @@
         let mutations = [];
         let rooms = [];
         let currentTab = 'dashboard';
+
+        // --- Custom Confirmation Dialog Utility ---
+        let confirmCallback = null;
+        window.customConfirm = (title, message, onConfirm, type = "danger") => {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = message;
+            const yesBtn = document.getElementById('btn-confirm-yes');
+            if (type === "danger") {
+                yesBtn.className = "flex-1 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition text-sm";
+            } else {
+                yesBtn.className = "flex-1 py-3 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 transition text-sm";
+            }
+            document.getElementById('confirm-modal').style.display = 'flex';
+            confirmCallback = onConfirm;
+        };
+
+        document.getElementById('btn-confirm-cancel').onclick = () => {
+            document.getElementById('confirm-modal').style.display = 'none';
+        };
+        document.getElementById('btn-confirm-yes').onclick = () => {
+            document.getElementById('confirm-modal').style.display = 'none';
+            if (confirmCallback) confirmCallback();
+        };
 
         // --- Core Authentication ---
         const initAuth = async () => {
@@ -251,7 +290,6 @@
             }
         });
 
-        // --- Data Listeners ---
         const setupListeners = () => {
             if (!user) return;
 
@@ -595,7 +633,7 @@
                     <td class="px-6 py-4 text-right">
                         <div class="flex justify-end gap-2">
                             <button onclick="editAsset('${a.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit"><i class="fas fa-edit"></i></button>
-                            <button onclick="deleteAsset('${a.id}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus"><i class="fas fa-trash-alt"></i></button>
+                            <button onclick="deleteAssetConfirm('${a.id}')" class="p-2 text-red-600 hover:bg-red-50 rounded-lg transition" title="Hapus"><i class="fas fa-trash-alt"></i></button>
                         </div>
                     </td>
                 </tr>
@@ -611,11 +649,16 @@
             }
         };
 
-        window.deleteAsset = async (id) => {
-            if (confirm("Apakah Anda yakin ingin menghapus aset ini secara permanen dari cloud?")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
-                showToast("Aset berhasil dihapus");
-            }
+        window.deleteAssetConfirm = (id) => {
+            customConfirm(
+                "Hapus Aset", 
+                "Apakah Anda yakin ingin menghapus aset ini secara permanen dari cloud?", 
+                async () => {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
+                    showToast("Aset berhasil dihapus");
+                }, 
+                "danger"
+            );
         };
 
         const renderPencarian = (container) => {
@@ -874,7 +917,7 @@
             document.getElementById('modal-overlay').style.display = 'flex';
         };
 
-        const renderInputMutasi = (container) => {
+        const renderInputMutasi = (container, editData = null) => {
             container.innerHTML = `
                 <div class="max-w-2xl mx-auto">
                     <form id="form-mutasi" class="card-glass p-8 rounded-[2rem] space-y-6">
@@ -882,52 +925,53 @@
                             <label class="text-sm font-bold text-gray-700">Pilih Barang yang Akan Dimutasi</label>
                             <select id="mutasi-asset-id" required class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
                                 <option value="">Cari Barang...</option>
-                                ${assets.map(a => `<option value="${a.id}">${a.nama} (${a.merk}) - Lokasi: ${a.lokasi} - Stok: ${a.jumlah}</option>`).join('')}
+                                ${assets.map(a => `<option value="${a.id}" ${editData?.assetId === a.id ? 'selected' : ''}>${a.nama} (${a.merk}) - Lokasi: ${a.lokasi} - Stok: ${a.jumlah}</option>`).join('')}
                             </select>
                         </div>
                         
                         <div class="space-y-2">
                             <label class="text-sm font-bold text-gray-700">Tanggal Mutasi <span class="text-red-500">*</span></label>
-                            <input type="date" id="mutasi-tanggal" required class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
+                            <input type="date" id="mutasi-tanggal" required value="${editData?.tanggalMutasi || ''}" class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
                         </div>
 
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-gray-700">Jenis Perubahan Status</label>
                                 <select id="mutasi-tipe" required class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
-                                    <option value="Mutasi">Mutasi Ruangan</option>
-                                    <option value="Rusak">Laporan Rusak</option>
-                                    <option value="Dipinjam">Peminjaman</option>
+                                    <option value="Mutasi" ${editData?.tipe === 'Mutasi' ? 'selected' : ''}>Mutasi Ruangan</option>
+                                    <option value="Rusak" ${editData?.tipe === 'Rusak' ? 'selected' : ''}>Laporan Rusak</option>
+                                    <option value="Dipinjam" ${editData?.tipe === 'Dipinjam' ? 'selected' : ''}>Peminjaman</option>
                                 </select>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-sm font-bold text-gray-700">Jumlah Barang</label>
-                                <input type="number" id="mutasi-jumlah" required min="1" placeholder="Max stok" class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
+                                <input type="number" id="mutasi-jumlah" required min="1" value="${editData?.jumlah || ''}" placeholder="Max stok" class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
                             </div>
                         </div>
 
-                        <div id="mutasi-ke-container" class="space-y-2">
+                        <div id="mutasi-ke-container" class="space-y-2" style="${editData?.tipe === 'Mutasi' || !editData ? 'display: block;' : 'display: none;'}">
                             <label class="text-sm font-bold text-gray-700">Ruangan Tujuan <span class="text-red-500">*</span></label>
                             <select id="mutasi-ke" class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
                                 <option value="">Pilih Ruangan Tujuan</option>
-                                ${rooms.map(r => `<option value="${r.nama}">${r.nama}</option>`).join('')}
+                                ${rooms.map(r => `<option value="${r.nama}" ${editData?.ke === r.nama ? 'selected' : ''}>${r.nama}</option>`).join('')}
                             </select>
                         </div>
 
                         <div class="space-y-2">
                             <label class="text-sm font-bold text-gray-700">Keterangan Tambahan</label>
-                            <textarea id="mutasi-keterangan" rows="3" placeholder="Alasan mutasi / detail kerusakan..." class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
+                            <textarea id="mutasi-keterangan" rows="3" placeholder="Alasan mutasi / detail kerusakan..." class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">${editData?.keterangan || ''}</textarea>
                         </div>
 
                         <button type="submit" id="btn-save-mutasi" class="w-full bg-teal-600 text-white font-bold py-4 rounded-2xl shadow-xl shadow-teal-100 hover:bg-teal-700 transition active:scale-[0.98]">
-                            Proses Perubahan Status
+                            ${editData ? 'Update Catatan Status / Mutasi' : 'Proses Perubahan Status'}
                         </button>
                     </form>
                 </div>
             `;
 
-            // Set Tanggal Mutasi default ke tanggal hari ini
-            document.getElementById('mutasi-tanggal').value = new Date().toISOString().split('T')[0];
+            if (!editData) {
+                document.getElementById('mutasi-tanggal').value = new Date().toISOString().split('T')[0];
+            }
 
             const tipeSelect = document.getElementById('mutasi-tipe');
             const keContainer = document.getElementById('mutasi-ke-container');
@@ -947,7 +991,7 @@
                 const keterangan = document.getElementById('mutasi-keterangan').value;
                 const tanggalMutasi = document.getElementById('mutasi-tanggal').value;
 
-                if (jumlah > asset.jumlah) return showToast("Jumlah melebihi stok yang tersedia!", "warning");
+                if (!editData && jumlah > asset.jumlah) return showToast("Jumlah melebihi stok yang tersedia!", "warning");
                 if (tipe === 'Mutasi' && !ke) return showToast("Harap pilih ruangan tujuan!", "warning");
                 if (tipe === 'Mutasi' && ke === asset.lokasi) return showToast("Ruangan tujuan tidak boleh sama dengan ruangan asal!", "warning");
 
@@ -956,69 +1000,92 @@
                 btn.innerHTML = '<div class="loader mx-auto"></div>';
 
                 try {
-                    // Update Original Asset Stock
-                    const newOldStock = asset.jumlah - jumlah;
-                    if (newOldStock === 0) {
-                        // If stock 0 and it's mutation, we can either update location or delete/mark.
-                        // Let's logic: if mutation, and stock moves all, change location.
-                        if (tipe === 'Mutasi') {
-                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), {
-                                lokasi: ke,
-                                jumlah: jumlah // This stays as is but location changes
-                            });
-                        } else {
-                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: 0 });
-                        }
+                    if (editData) {
+                        // Update existing mutation record
+                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', editData.id), {
+                            assetId,
+                            namaBarang: asset.nama,
+                            merk: asset.merk,
+                            tipe,
+                            jumlah,
+                            dari: asset.lokasi,
+                            ke: tipe === 'Mutasi' ? ke : '-',
+                            keterangan,
+                            tanggalMutasi,
+                            updatedAt: serverTimestamp()
+                        });
+                        showToast("Catatan mutasi berhasil diperbarui!");
                     } else {
-                        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: newOldStock });
-                        
-                        // If it's a mutation, we check if the item already exists in target room
-                        if (tipe === 'Mutasi') {
-                            const existingInNewRoom = assets.find(a => a.nama === asset.nama && a.merk === asset.merk && a.lokasi === ke);
-                            if (existingInNewRoom) {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', existingInNewRoom.id), {
-                                    jumlah: existingInNewRoom.jumlah + jumlah
+                        // Update Original Asset Stock
+                        const newOldStock = asset.jumlah - jumlah;
+                        if (newOldStock === 0) {
+                            if (tipe === 'Mutasi') {
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), {
+                                    lokasi: ke,
+                                    jumlah: jumlah
                                 });
                             } else {
-                                // Create new entry for this room
-                                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), {
-                                    ...asset,
-                                    id: undefined,
-                                    jumlah: jumlah,
-                                    lokasi: ke,
-                                    createdAt: serverTimestamp()
-                                });
+                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: 0 });
+                            }
+                        } else {
+                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: newOldStock });
+                            
+                            if (tipe === 'Mutasi') {
+                                const existingInNewRoom = assets.find(a => a.nama === asset.nama && a.merk === asset.merk && a.lokasi === ke);
+                                if (existingInNewRoom) {
+                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', existingInNewRoom.id), {
+                                        jumlah: existingInNewRoom.jumlah + jumlah
+                                    });
+                                } else {
+                                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), {
+                                        ...asset,
+                                        id: undefined,
+                                        jumlah: jumlah,
+                                        lokasi: ke,
+                                        createdAt: serverTimestamp()
+                                    });
+                                }
                             }
                         }
+
+                        // Record Mutation
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), {
+                            assetId: asset.id,
+                            namaBarang: asset.nama,
+                            merk: asset.merk,
+                            tipe,
+                            jumlah,
+                            dari: asset.lokasi,
+                            ke: tipe === 'Mutasi' ? ke : '-',
+                            keterangan,
+                            tanggalMutasi: tanggalMutasi,
+                            createdAt: serverTimestamp()
+                        });
+                        showToast("Mutasi Berhasil diproses!");
                     }
 
-                    // Record Mutation
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), {
-                        assetId: asset.id,
-                        namaBarang: asset.nama,
-                        merk: asset.merk,
-                        tipe,
-                        jumlah,
-                        dari: asset.lokasi,
-                        ke: tipe === 'Mutasi' ? ke : '-',
-                        keterangan,
-                        tanggalMutasi: tanggalMutasi,
-                        createdAt: serverTimestamp()
-                    });
-
-                    showToast("Mutasi Berhasil diproses!");
                     switchTab('db-mutasi');
                 } catch (err) {
                     console.error(err);
                     showToast("Gagal memproses mutasi", "error");
                     btn.disabled = false;
-                    btn.innerText = "Proses Perubahan Status";
+                    btn.innerText = editData ? "Update Catatan Status / Mutasi" : "Proses Perubahan Status";
                 }
             };
         };
 
         const renderDBMutasi = (container) => {
             container.innerHTML = `
+                <div class="flex flex-col md:flex-row gap-4 mb-6">
+                    <div class="flex-1 relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="mut-search" placeholder="Cari barang, tipe, atau lokasi..." class="w-full pl-12 pr-4 py-3 bg-white rounded-xl shadow-sm outline-none focus:ring-2 focus:ring-teal-500 transition">
+                    </div>
+                    <button onclick="exportMutationsToPDF()" class="bg-teal-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-teal-700 transition flex items-center gap-2">
+                        <i class="fas fa-print"></i> Cetak PDF Riwayat
+                    </button>
+                </div>
+
                 <div class="card-glass rounded-[2rem] overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
@@ -1032,46 +1099,78 @@
                                     <th class="px-6 py-4 text-xs font-bold uppercase tracking-wider text-right">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100">
-                                ${mutations.length === 0 ? '<tr><td colspan="6" class="p-12 text-center text-gray-400">Belum ada riwayat mutasi.</td></tr>' : 
-                                  mutations.map(m => `
-                                    <tr class="hover:bg-teal-50/30 transition">
-                                        <td class="px-6 py-4 text-xs text-gray-500">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
-                                        <td class="px-6 py-4">
-                                            <p class="font-bold text-gray-800 text-sm">${m.namaBarang}</p>
-                                            <p class="text-[10px] text-gray-400">${m.merk}</p>
-                                        </td>
-                                        <td class="px-6 py-4 text-center">
-                                            <span class="px-3 py-1 rounded-full text-[10px] font-bold ${m.tipe === 'Mutasi' ? 'bg-amber-100 text-amber-700' : m.tipe === 'Rusak' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">
-                                                ${m.tipe}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 text-xs">
-                                            <div class="flex items-center gap-2">
-                                                <span class="font-bold text-gray-600">${m.dari}</span>
-                                                <i class="fas fa-arrow-right text-[10px] text-gray-300"></i>
-                                                <span class="font-bold text-teal-600">${m.ke}</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4 text-center font-bold">${m.jumlah}</td>
-                                        <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
-                                            ${m.tipe === 'Rusak' ? `<button onclick="cetakBaKerusakanLangsung('${m.id}')" class="bg-teal-600 text-white px-3 py-1 rounded-lg text-xs font-bold hover:bg-teal-700 transition" title="Cetak Berita Acara"><i class="fas fa-print"></i> BA</button>` : ''}
-                                            <button onclick="deleteMutation('${m.id}')" class="text-red-400 hover:text-red-600 transition p-2"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                `).join('')}
+                            <tbody id="mut-table-body" class="divide-y divide-gray-100">
+                                ${renderMutationsTableRows(mutations)}
                             </tbody>
                         </table>
                     </div>
                 </div>
             `;
+
+            document.getElementById('mut-search').oninput = (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = mutations.filter(m => 
+                    m.namaBarang.toLowerCase().includes(term) || 
+                    m.merk.toLowerCase().includes(term) || 
+                    m.dari.toLowerCase().includes(term) ||
+                    m.ke.toLowerCase().includes(term) ||
+                    m.tipe.toLowerCase().includes(term)
+                );
+                document.getElementById('mut-table-body').innerHTML = renderMutationsTableRows(filtered);
+            };
         };
 
-        window.deleteMutation = async (id) => {
-            if (confirm("Hapus catatan mutasi ini? (Tidak mengembalikan stok)")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id));
-                showToast("Catatan mutasi dihapus");
+        const renderMutationsTableRows = (dataList) => {
+            if (dataList.length === 0) return '<tr><td colspan="6" class="p-12 text-center text-gray-400">Belum ada riwayat mutasi.</td></tr>';
+            
+            return dataList.map(m => `
+                <tr class="hover:bg-teal-50/30 transition">
+                    <td class="px-6 py-4 text-xs text-gray-500">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
+                    <td class="px-6 py-4">
+                        <p class="font-bold text-gray-800 text-sm">${m.namaBarang}</p>
+                        <p class="text-[10px] text-gray-400">${m.merk}</p>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="px-3 py-1 rounded-full text-[10px] font-bold ${m.tipe === 'Mutasi' ? 'bg-amber-100 text-amber-700' : m.tipe === 'Rusak' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}">
+                            ${m.tipe}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-gray-600">${m.dari}</span>
+                            <i class="fas fa-arrow-right text-[10px] text-gray-300"></i>
+                            <span class="font-bold text-teal-600">${m.ke}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-center font-bold">${m.jumlah}</td>
+                    <td class="px-6 py-4 text-right flex items-center justify-end gap-1">
+                        ${m.tipe === 'Rusak' ? `<button onclick="cetakBaKerusakanLangsung('${m.id}')" class="bg-teal-600 text-white px-2 py-1 rounded-lg text-xs font-bold hover:bg-teal-700 transition" title="Cetak Berita Acara"><i class="fas fa-print"></i> BA</button>` : ''}
+                        <button onclick="editMutation('${m.id}')" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Riwayat"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteMutationConfirm('${m.id}')" class="text-red-400 hover:text-red-600 transition p-2" title="Hapus Riwayat"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        window.editMutation = (id) => {
+            const data = mutations.find(m => m.id === id);
+            if (data) {
+                switchTab('input-mutasi');
+                renderInputMutasi(document.getElementById('content-container'), data);
+                document.getElementById('tab-title').innerText = "Edit Status / Riwayat Mutasi";
             }
+        };
+
+        window.deleteMutationConfirm = (id) => {
+            customConfirm(
+                "Hapus Riwayat Mutasi", 
+                "Apakah Anda yakin ingin menghapus catatan mutasi ini? Tindakan ini tidak akan mengembalikan jumlah stok fisik barang.", 
+                async () => {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id));
+                    showToast("Catatan mutasi berhasil dihapus");
+                }, 
+                "danger"
+            );
         };
 
         const renderBeritaAcara = (container) => {
@@ -1173,7 +1272,6 @@
                 </div>
             `;
 
-            // Default values
             document.getElementById('ba-tanggal').value = new Date().toISOString().split('T')[0];
 
             document.getElementById('form-ba-rusak').onsubmit = (e) => {
@@ -1189,7 +1287,7 @@
                     kode: asset.kode || '-',
                     lokasi: asset.lokasi,
                     tanggal: document.getElementById('ba-tanggal').value,
-                    tanggalBeli: asset.tanggal || '-', // Otomatis mengambil tanggal pembelian langsung dari database aset
+                    tanggalBeli: asset.tanggal || '-',
                     jenisKerusakan: document.getElementById('ba-jenis-kerusakan').value,
                     detail: document.getElementById('ba-detail').value,
                     signKepala: document.getElementById('ba-sign-kepala').value,
@@ -1241,14 +1339,14 @@
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
 
-            // --- KOP SURAT RSU DADI KELUARGA ---
+            // --- KOP SURAT RSU DADI KELUARGA (BLUE TIMES NEW ROMAN) ---
             doc.setFontSize(22);
-            doc.setTextColor(0, 51, 204); // Blue color (Royal Blue)
+            doc.setTextColor(0, 51, 204); 
             doc.setFont("times", "bold");
             doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 18, { align: 'center' });
             
             doc.setFontSize(9);
-            doc.setTextColor(0, 51, 204); // Blue color matching subheader
+            doc.setTextColor(0, 51, 204); 
             doc.setFont("times", "normal");
             doc.text("Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan, Kab. Banyumas", 105, 23, { align: 'center' });
             doc.text("Telp: (0281) 6844005 • Email: info@rsudadikeluarga.co.id • Purwokerto 53145", 105, 27, { align: 'center' });
@@ -1356,6 +1454,88 @@
             showToast("Berita Acara Kerusakan berhasil dicetak!");
         };
 
+        // --- NEW: Export Mutations History to professional PDF with Hospital Kop ---
+        window.exportMutationsToPDF = () => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+
+            // --- KOP SURAT RSU DADI KELUARGA (BLUE TIMES NEW ROMAN) ---
+            doc.setFontSize(22);
+            doc.setTextColor(0, 51, 204); 
+            doc.setFont("times", "bold");
+            doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 18, { align: 'center' });
+            
+            doc.setFontSize(9);
+            doc.setTextColor(0, 51, 204); 
+            doc.setFont("times", "normal");
+            doc.text("Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan, Kab. Banyumas", 105, 23, { align: 'center' });
+            doc.text("Telp: (0281) 6844005 • Email: info@rsudadikeluarga.co.id • Purwokerto 53145", 105, 27, { align: 'center' });
+            
+            // Double divider line in blue color
+            doc.setDrawColor(0, 51, 204);
+            doc.setLineWidth(0.8);
+            doc.line(15, 30, 195, 30);
+            doc.setLineWidth(0.2);
+            doc.line(15, 31.2, 195, 31.2);
+
+            // --- JUDUL LAPORAN ---
+            doc.setFontSize(14);
+            doc.setTextColor(0);
+            doc.setFont("helvetica", "bold");
+            doc.text("LAPORAN RIWAYAT MUTASI & STATUS ASET", 15, 42);
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')} • Bagian Rumah Tangga`, 15, 47);
+
+            // --- DATA TABLE ---
+            const tableRows = mutations.map((m, idx) => {
+                const dateStr = m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID');
+                const movementStr = m.tipe === 'Mutasi' ? `${m.dari} -> ${m.ke}` : m.dari;
+                return [
+                    idx + 1,
+                    dateStr,
+                    `${m.namaBarang} (${m.merk})`,
+                    m.tipe,
+                    movementStr,
+                    m.jumlah,
+                    m.keterangan || '-'
+                ];
+            });
+
+            doc.autoTable({
+                startY: 52,
+                head: [['No', 'Tanggal', 'Nama Aset', 'Status/Tipe', 'Asal & Tujuan Ruang', 'Qty', 'Keterangan']],
+                body: tableRows,
+                theme: 'striped',
+                headStyles: { fillColor: [0, 51, 204] }, // Match Blue Brand Color
+                styles: { fontSize: 8, cellPadding: 3 },
+                columnStyles: {
+                    0: { cellWidth: 10 },
+                    1: { cellWidth: 22 },
+                    2: { cellWidth: 45 },
+                    3: { cellWidth: 20 },
+                    4: { cellWidth: 45 },
+                    5: { cellWidth: 12, hAlign: 'center' },
+                    6: { cellWidth: 26 }
+                }
+            });
+
+            // --- SIGNATURES ---
+            const finalY = doc.lastAutoTable.finalY + 15;
+            doc.setFontSize(9);
+            doc.text("Purwokerto, " + new Date().toLocaleDateString('id-ID'), 140, finalY);
+            doc.text("Pencatat Logistik,", 30, finalY + 5);
+            doc.text("Koordinator Rumah Tangga,", 140, finalY + 5);
+
+            doc.text("( ____________________ )", 30, finalY + 28);
+            doc.text("Adi Wijaya, S.E.", 140, finalY + 28, { fontStyle: 'bold' });
+            doc.text("( ____________________ )", 140, finalY + 33);
+
+            doc.save(`Laporan_Riwayat_Mutasi_${Date.now()}.pdf`);
+            showToast("Laporan Riwayat Mutasi berhasil dicetak ke PDF!");
+        };
+
         const renderImportExport = (container) => {
             container.innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
@@ -1413,7 +1593,7 @@
                                             </div>
                                         </td>
                                         <td class="px-8 py-5 text-right">
-                                            <button onclick="deleteRoom('${r.id}')" class="text-red-400 hover:text-red-600 transition opacity-0 group-hover:opacity-100"><i class="fas fa-trash"></i></button>
+                                            <button onclick="deleteRoomConfirm('${r.id}')" class="text-red-400 hover:text-red-600 transition opacity-0 group-hover:opacity-100"><i class="fas fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join(rooms.length === 0 ? '<tr><td class="p-10 text-center text-gray-400">Belum ada ruangan terdaftar.</td></tr>' : '')}
@@ -1424,7 +1604,6 @@
             `;
         };
 
-        // --- Helper Logic Functions ---
         window.addRoom = async () => {
             const name = document.getElementById('master-room-name').value;
             if (!name) return;
@@ -1433,11 +1612,16 @@
             showToast("Ruangan berhasil ditambahkan");
         };
 
-        window.deleteRoom = async (id) => {
-            if (confirm("Hapus ruangan ini? Aset yang berada di ruangan ini tidak akan terhapus namun lokasinya akan menjadi tidak valid.")) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
-                showToast("Ruangan dihapus");
-            }
+        window.deleteRoomConfirm = (id) => {
+            customConfirm(
+                "Hapus Ruangan", 
+                "Hapus ruangan ini? Aset yang berada di ruangan ini tidak akan terhapus namun lokasinya akan menjadi tidak valid.", 
+                async () => {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
+                    showToast("Ruangan dihapus");
+                }, 
+                "danger"
+            );
         };
 
         window.exportToExcel = () => {
