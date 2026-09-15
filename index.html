@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SIARS - Sistem Informasi Aset Rumah Sakit</title>
     
-    <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -174,20 +173,15 @@
 
         <!-- Main Content -->
         <main class="flex-1 flex flex-col relative overflow-hidden">
-            <!-- Header -->
             <header class="h-16 border-b bg-white/50 backdrop-blur-md flex items-center justify-between px-8 no-print z-30">
                 <h2 id="tab-title" class="text-xl font-bold text-gray-800">Dashboard</h2>
                 <div class="flex items-center gap-4">
                     <div id="status-cloud" class="flex items-center gap-2 text-xs text-green-600">
                         <i class="fas fa-cloud"></i> Cloud Connected
                     </div>
-                    <button class="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-500">
-                        <i class="fas fa-bell"></i>
-                    </button>
                 </div>
             </header>
 
-            <!-- Scrollable Content Area -->
             <div id="content-container" class="flex-1 overflow-y-auto p-8 relative z-10">
                 <!-- Tabs will be rendered here -->
             </div>
@@ -204,7 +198,7 @@
         </div>
     </div>
 
-    <!-- Kustom Modal Konfirmasi Modern -->
+    <!-- Kustom Modal Konfirmasi -->
     <div id="confirm-modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-[110] no-print">
         <div class="bg-white rounded-3xl p-6 max-w-sm w-full mx-4 shadow-2xl text-center space-y-6">
             <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-2xl mx-auto">
@@ -221,7 +215,6 @@
         </div>
     </div>
 
-    <!-- Firebase & Logic Scripts -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -246,7 +239,20 @@
         let rooms = [];
         let currentTab = 'dashboard';
 
-        // --- Custom Confirmation Dialog Utility ---
+        // --- Custom Utility Functions ---
+        window.showToast = (message, type = 'success') => {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 text-white px-6 py-3 rounded-xl shadow-2xl z-[9999] transition-all transform translate-y-10 opacity-0 ${type === 'success' ? 'bg-teal-600' : type === 'warning' ? 'bg-amber-500' : 'bg-red-500'}`;
+            toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-info-circle'} mr-2"></i> ${message}`;
+            document.body.appendChild(toast);
+            
+            requestAnimationFrame(() => toast.classList.remove('translate-y-10', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('translate-y-10', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
         let confirmCallback = null;
         window.customConfirm = (title, message, onConfirm, type = "danger") => {
             document.getElementById('confirm-title').innerText = title;
@@ -261,9 +267,8 @@
             confirmCallback = onConfirm;
         };
 
-        document.getElementById('btn-confirm-cancel').onclick = () => {
-            document.getElementById('confirm-modal').style.display = 'none';
-        };
+        window.closeModal = () => document.getElementById('modal-overlay').style.display = 'none';
+        document.getElementById('btn-confirm-cancel').onclick = () => document.getElementById('confirm-modal').style.display = 'none';
         document.getElementById('btn-confirm-yes').onclick = () => {
             document.getElementById('confirm-modal').style.display = 'none';
             if (confirmCallback) confirmCallback();
@@ -292,24 +297,18 @@
 
         const setupListeners = () => {
             if (!user) return;
-
-            // Rooms Listener
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), (snapshot) => {
                 rooms = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderCurrentTab();
-            }, (err) => console.error("Room Listener Err:", err));
-
-            // Assets Listener
+            });
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), (snapshot) => {
                 assets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderCurrentTab();
-            }, (err) => console.error("Asset Listener Err:", err));
-
-            // Mutations Listener
+            });
             onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), (snapshot) => {
                 mutations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderCurrentTab();
-            }, (err) => console.error("Mutation Listener Err:", err));
+            });
         };
 
         // --- Navigation Logic ---
@@ -335,18 +334,16 @@
             renderCurrentTab();
         };
 
-        // --- Render Functions ---
         const renderCurrentTab = () => {
             const container = document.getElementById('content-container');
             if (!container) return;
-
             switch(currentTab) {
                 case 'dashboard': renderDashboard(container); break;
                 case 'input-aset': renderInputAset(container); break;
                 case 'database': renderDatabase(container); break;
-                case 'pencarian': renderPencarian(container); break;
+                case 'pencarian': renderPencarian(container); break; // Diperbarui
                 case 'ruangan': renderRuangan(container); break;
-                case 'input-mutasi': renderInputMutasi(container); break;
+                case 'input-mutasi': renderInputMutasi(container); break; // Diperbarui
                 case 'db-mutasi': renderDBMutasi(container); break;
                 case 'berita-acara': renderBeritaAcara(container); break;
                 case 'import-export': renderImportExport(container); break;
@@ -602,7 +599,7 @@
                 const filtered = assets.filter(a => 
                     a.nama.toLowerCase().includes(term) || 
                     a.merk.toLowerCase().includes(term) || 
-                    a.kode.toLowerCase().includes(term)
+                    (a.kode && a.kode.toLowerCase().includes(term))
                 );
                 document.getElementById('db-table-body').innerHTML = renderTableRows(filtered);
             };
@@ -610,7 +607,6 @@
 
         const renderTableRows = (dataList) => {
             if (dataList.length === 0) return `<tr><td colspan="6" class="px-6 py-12 text-center text-gray-400">Tidak ada data aset ditemukan.</td></tr>`;
-            
             return dataList.map(a => `
                 <tr class="hover:bg-teal-50/30 transition group">
                     <td class="px-6 py-4">
@@ -650,15 +646,10 @@
         };
 
         window.deleteAssetConfirm = (id) => {
-            customConfirm(
-                "Hapus Aset", 
-                "Apakah Anda yakin ingin menghapus aset ini secara permanen dari cloud?", 
-                async () => {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
-                    showToast("Aset berhasil dihapus");
-                }, 
-                "danger"
-            );
+            customConfirm("Hapus Aset", "Apakah Anda yakin ingin menghapus aset ini secara permanen?", async () => {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', id));
+                showToast("Aset berhasil dihapus");
+            });
         };
 
         const renderPencarian = (container) => {
@@ -669,8 +660,11 @@
                         <div class="space-y-4">
                             <div class="relative">
                                 <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                                <input type="text" id="search-input" placeholder="Masukkan Nama Barang atau Kode Inventaris..." class="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500 transition shadow-inner">
+                                <input type="text" id="search-input" autocomplete="off" placeholder="Ketik Nama, Merk, atau Kode Inventaris..." class="w-full pl-12 pr-4 py-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500 transition shadow-inner">
                             </div>
+                            <!-- Dropdown List Hasil Pencarian -->
+                            <div id="search-list-container" class="hidden text-left bg-white shadow-xl rounded-2xl border border-gray-100 max-h-60 overflow-y-auto mt-2 z-50 relative"></div>
+                            
                             <div class="flex items-center gap-4 py-2">
                                 <div class="flex-1 h-px bg-gray-200"></div>
                                 <span class="text-xs text-gray-400 font-bold uppercase">ATAU</span>
@@ -684,26 +678,56 @@
                     </div>
 
                     <div id="search-result" class="hidden">
-                        <!-- Search result will appear here -->
+                        <!-- Detail Asset Will Appear Here -->
                     </div>
                 </div>
             `;
 
             const input = document.getElementById('search-input');
             const resultDiv = document.getElementById('search-result');
+            const listContainer = document.getElementById('search-list-container');
             let html5QrCode = null;
+
+            // Global function to select from search list
+            window.selectSearchAsset = (id) => {
+                const asset = assets.find(a => a.id === id);
+                if (asset) {
+                    listContainer.classList.add('hidden');
+                    input.value = asset.nama; // Fill input with selected name
+                    showAssetDetail(asset);
+                }
+            };
 
             input.oninput = (e) => {
                 const term = e.target.value.toLowerCase();
+                resultDiv.classList.add('hidden'); // Sembunyikan detail saat mengetik ulang
+                
                 if (term.length < 2) {
-                    resultDiv.classList.add('hidden');
+                    listContainer.classList.add('hidden');
                     return;
                 }
-                const found = assets.find(a => a.nama.toLowerCase().includes(term) || (a.kode && a.kode.toLowerCase().includes(term)));
-                if (found) {
-                    showAssetDetail(found);
+
+                // Cari barang berdasarkan nama, kode, atau merk
+                const foundAssets = assets.filter(a => 
+                    a.nama.toLowerCase().includes(term) || 
+                    (a.kode && a.kode.toLowerCase().includes(term)) ||
+                    a.merk.toLowerCase().includes(term)
+                );
+
+                listContainer.classList.remove('hidden');
+                
+                if (foundAssets.length > 0) {
+                    listContainer.innerHTML = foundAssets.map(a => `
+                        <div class="p-4 border-b border-gray-50 hover:bg-teal-50 cursor-pointer flex justify-between items-center transition" onclick="selectSearchAsset('${a.id}')">
+                            <div>
+                                <p class="font-bold text-gray-800 text-sm">${a.nama}</p>
+                                <p class="text-[10px] text-gray-500">${a.merk} | SN: ${a.kode || '-'}</p>
+                            </div>
+                            <span class="text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-1 rounded-full">${a.lokasi}</span>
+                        </div>
+                    `).join('');
                 } else {
-                    resultDiv.classList.add('hidden');
+                    listContainer.innerHTML = `<div class="p-4 text-sm text-gray-500 text-center">Tidak ada aset ditemukan untuk pencarian ini.</div>`;
                 }
             };
 
@@ -716,25 +740,32 @@
                 }
 
                 if (reader.classList.contains('hidden')) {
-                    html5QrCode.stop();
+                    html5QrCode.stop().catch(err => console.error(err));
                 } else {
+                    listContainer.classList.add('hidden');
+                    resultDiv.classList.add('hidden');
+                    
                     html5QrCode.start(
                         { facingMode: "environment" },
-                        { fps: 10, qrbox: 250 },
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
                         (decodedText) => {
                             input.value = decodedText;
                             const found = assets.find(a => a.kode === decodedText);
                             if (found) {
                                 showAssetDetail(found);
-                                html5QrCode.stop();
-                                reader.classList.add('hidden');
+                                html5QrCode.stop().then(() => {
+                                    reader.classList.add('hidden');
+                                }).catch(err => console.error(err));
                             } else {
-                                showToast("Kode tidak terdaftar di database", "warning");
+                                showToast("Kode batang tidak terdaftar di database", "warning");
                             }
+                        },
+                        (errorMessage) => {
+                            // Ignored background scan errors
                         }
                     ).catch(err => {
                         console.error(err);
-                        showToast("Kamera tidak dapat diakses", "error");
+                        showToast("Kamera tidak dapat diakses. Pastikan izin telah diberikan.", "error");
                     });
                 }
             };
@@ -757,19 +788,19 @@
                     </div>
                     <div class="p-8 space-y-6">
                         <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-gray-50 p-4 rounded-2xl">
+                            <div class="bg-gray-50 p-4 rounded-2xl border">
                                 <p class="text-[10px] text-gray-400 font-bold uppercase">Lokasi Saat Ini</p>
                                 <p class="text-teal-700 font-bold">${asset.lokasi}</p>
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-2xl">
+                            <div class="bg-gray-50 p-4 rounded-2xl border">
                                 <p class="text-[10px] text-gray-400 font-bold uppercase">Stok Tersedia</p>
                                 <p class="text-gray-800 font-bold">${asset.jumlah} Unit</p>
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-2xl">
+                            <div class="bg-gray-50 p-4 rounded-2xl border">
                                 <p class="text-[10px] text-gray-400 font-bold uppercase">Kode SN/Inventaris</p>
                                 <p class="text-gray-800 font-mono text-sm">${asset.kode || '-'}</p>
                             </div>
-                            <div class="bg-gray-50 p-4 rounded-2xl">
+                            <div class="bg-gray-50 p-4 rounded-2xl border">
                                 <p class="text-[10px] text-gray-400 font-bold uppercase">Tgl Beli</p>
                                 <p class="text-gray-800 font-bold">${asset.tanggal || '-'}</p>
                             </div>
@@ -818,16 +849,13 @@
                                 <option value="">Semua Ruangan</option>
                                 ${rooms.map(r => `<option value="${r.nama}">${r.nama}</option>`).join('')}
                             </select>
-                            <button id="btn-print-room" class="bg-teal-600 text-white px-6 rounded-xl font-bold hover:bg-teal-700 transition">
+                            <button onclick="exportToPDF(document.getElementById('filter-ruangan').value)" class="bg-teal-600 text-white px-6 rounded-xl font-bold hover:bg-teal-700 transition">
                                 <i class="fas fa-print mr-2"></i> Cetak PDF
                             </button>
                         </div>
                     </div>
                 </div>
-
-                <div id="room-asset-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Assets filtered by room -->
-                </div>
+                <div id="room-asset-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             `;
 
             const filter = document.getElementById('filter-ruangan');
@@ -857,18 +885,11 @@
 
             filter.onchange = (e) => renderFiltered(e.target.value);
             renderFiltered("");
-
-            document.getElementById('btn-print-room').onclick = () => {
-                const room = filter.value;
-                if (!room) return showToast("Pilih ruangan terlebih dahulu", "warning");
-                exportToPDF(room);
-            };
         };
 
         window.openAssetPreview = (id) => {
             const asset = assets.find(a => a.id === id);
             if (!asset) return;
-
             const modalBody = document.getElementById('modal-body');
             modalBody.innerHTML = `
                 <div class="flex flex-col md:flex-row gap-8">
@@ -890,27 +911,7 @@
                                 <p class="text-xl font-bold text-teal-700">${asset.lokasi}</p>
                             </div>
                         </div>
-                        <div class="space-y-3">
-                            <div class="flex justify-between border-b pb-2">
-                                <span class="text-gray-500 text-sm">Kode Inventaris</span>
-                                <span class="font-mono font-bold">${asset.kode || '-'}</span>
-                            </div>
-                            <div class="flex justify-between border-b pb-2">
-                                <span class="text-gray-500 text-sm">Tgl Pembelian</span>
-                                <span class="font-bold">${asset.tanggal || '-'}</span>
-                            </div>
-                            <div class="flex justify-between border-b pb-2">
-                                <span class="text-gray-500 text-sm">Vendor</span>
-                                <span class="font-bold">${asset.vendor || '-'}</span>
-                            </div>
-                            <div class="flex justify-between border-b pb-2">
-                                <span class="text-gray-500 text-sm">Estimasi Harga</span>
-                                <span class="font-bold">Rp ${parseInt(asset.harga).toLocaleString()}</span>
-                            </div>
-                        </div>
-                        <button onclick="closeModal()" class="w-full bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl hover:bg-gray-200 transition">
-                            Tutup Preview
-                        </button>
+                        <button onclick="closeModal()" class="w-full bg-gray-100 text-gray-700 font-bold py-4 rounded-2xl hover:bg-gray-200 transition">Tutup Preview</button>
                     </div>
                 </div>
             `;
@@ -918,14 +919,30 @@
         };
 
         const renderInputMutasi = (container, editData = null) => {
+            let initialRoom = '';
+            if (editData) {
+                const asset = assets.find(a => a.id === editData.assetId);
+                if (asset) initialRoom = asset.lokasi;
+            }
+
             container.innerHTML = `
                 <div class="max-w-2xl mx-auto">
                     <form id="form-mutasi" class="card-glass p-8 rounded-[2rem] space-y-6">
+                        
+                        <!-- FILTER RUANGAN ASAL -->
+                        <div class="space-y-2 p-4 bg-teal-50 rounded-2xl border border-teal-100">
+                            <label class="text-sm font-bold text-teal-900"><i class="fas fa-filter mr-1"></i> Filter Ruangan Asal Barang</label>
+                            <select id="mutasi-filter-ruangan" class="w-full p-4 bg-white border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none shadow-sm">
+                                <option value="">-- Pilih Ruangan Asal Dahulu --</option>
+                                ${rooms.map(r => `<option value="${r.nama}" ${initialRoom === r.nama ? 'selected' : ''}>${r.nama}</option>`).join('')}
+                            </select>
+                            <p class="text-xs text-teal-700 mt-1">Pilih ruangan asal untuk menampilkan daftar barang yang tersedia.</p>
+                        </div>
+
                         <div class="space-y-2">
-                            <label class="text-sm font-bold text-gray-700">Pilih Barang yang Akan Dimutasi</label>
+                            <label class="text-sm font-bold text-gray-700">Pilih Barang yang Akan Dimutasi <span class="text-red-500">*</span></label>
                             <select id="mutasi-asset-id" required class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none">
-                                <option value="">Cari Barang...</option>
-                                ${assets.map(a => `<option value="${a.id}" ${editData?.assetId === a.id ? 'selected' : ''}>${a.nama} (${a.merk}) - Lokasi: ${a.lokasi} - Stok: ${a.jumlah}</option>`).join('')}
+                                <option value="">Pilih Ruangan Terlebih Dahulu...</option>
                             </select>
                         </div>
                         
@@ -969,9 +986,30 @@
                 </div>
             `;
 
-            if (!editData) {
-                document.getElementById('mutasi-tanggal').value = new Date().toISOString().split('T')[0];
-            }
+            const filterRoom = document.getElementById('mutasi-filter-ruangan');
+            const assetSelect = document.getElementById('mutasi-asset-id');
+
+            const populateAssets = (roomName) => {
+                if (!roomName) {
+                    assetSelect.innerHTML = '<option value="">Pilih Ruangan Terlebih Dahulu...</option>';
+                    return;
+                }
+                const filteredAssets = assets.filter(a => a.lokasi === roomName && a.jumlah > 0);
+                if (filteredAssets.length === 0) {
+                    assetSelect.innerHTML = '<option value="">Tidak ada barang fisik di ruangan ini.</option>';
+                } else {
+                    assetSelect.innerHTML = '<option value="">-- Pilih Barang --</option>' + 
+                        filteredAssets.map(a => `<option value="${a.id}" ${editData?.assetId === a.id ? 'selected' : ''}>${a.nama} (${a.merk}) - Stok: ${a.jumlah}</option>`).join('');
+                }
+            };
+
+            // Trigger populasi saat filter ruangan berubah
+            filterRoom.onchange = (e) => populateAssets(e.target.value);
+            
+            // Inisialisasi daftar barang jika sedang mode edit
+            if (initialRoom) populateAssets(initialRoom);
+
+            if (!editData) document.getElementById('mutasi-tanggal').value = new Date().toISOString().split('T')[0];
 
             const tipeSelect = document.getElementById('mutasi-tipe');
             const keContainer = document.getElementById('mutasi-ke-container');
@@ -984,6 +1022,8 @@
                 if (!user) return;
 
                 const assetId = document.getElementById('mutasi-asset-id').value;
+                if (!assetId) return showToast("Harap pilih barang yang akan dimutasi!", "warning");
+
                 const asset = assets.find(a => a.id === assetId);
                 const jumlah = parseInt(document.getElementById('mutasi-jumlah').value);
                 const tipe = document.getElementById('mutasi-tipe').value;
@@ -991,7 +1031,7 @@
                 const keterangan = document.getElementById('mutasi-keterangan').value;
                 const tanggalMutasi = document.getElementById('mutasi-tanggal').value;
 
-                if (!editData && jumlah > asset.jumlah) return showToast("Jumlah melebihi stok yang tersedia!", "warning");
+                if (!editData && jumlah > asset.jumlah) return showToast("Jumlah melebihi stok fisik yang tersedia!", "warning");
                 if (tipe === 'Mutasi' && !ke) return showToast("Harap pilih ruangan tujuan!", "warning");
                 if (tipe === 'Mutasi' && ke === asset.lokasi) return showToast("Ruangan tujuan tidak boleh sama dengan ruangan asal!", "warning");
 
@@ -1001,69 +1041,36 @@
 
                 try {
                     if (editData) {
-                        // Update existing mutation record
                         await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', editData.id), {
-                            assetId,
-                            namaBarang: asset.nama,
-                            merk: asset.merk,
-                            tipe,
-                            jumlah,
-                            dari: asset.lokasi,
-                            ke: tipe === 'Mutasi' ? ke : '-',
-                            keterangan,
-                            tanggalMutasi,
-                            updatedAt: serverTimestamp()
+                            assetId, namaBarang: asset.nama, merk: asset.merk,
+                            tipe, jumlah, dari: asset.lokasi, ke: tipe === 'Mutasi' ? ke : '-',
+                            keterangan, tanggalMutasi, updatedAt: serverTimestamp()
                         });
                         showToast("Catatan mutasi berhasil diperbarui!");
                     } else {
-                        // Update Original Asset Stock
                         const newOldStock = asset.jumlah - jumlah;
                         if (newOldStock === 0) {
-                            if (tipe === 'Mutasi') {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), {
-                                    lokasi: ke,
-                                    jumlah: jumlah
-                                });
-                            } else {
-                                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: 0 });
-                            }
+                            if (tipe === 'Mutasi') await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { lokasi: ke, jumlah: jumlah });
+                            else await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: 0 });
                         } else {
                             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', asset.id), { jumlah: newOldStock });
-                            
                             if (tipe === 'Mutasi') {
                                 const existingInNewRoom = assets.find(a => a.nama === asset.nama && a.merk === asset.merk && a.lokasi === ke);
                                 if (existingInNewRoom) {
-                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', existingInNewRoom.id), {
-                                        jumlah: existingInNewRoom.jumlah + jumlah
-                                    });
+                                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'assets', existingInNewRoom.id), { jumlah: existingInNewRoom.jumlah + jumlah });
                                 } else {
-                                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), {
-                                        ...asset,
-                                        id: undefined,
-                                        jumlah: jumlah,
-                                        lokasi: ke,
-                                        createdAt: serverTimestamp()
-                                    });
+                                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), { ...asset, id: undefined, jumlah: jumlah, lokasi: ke, createdAt: serverTimestamp() });
                                 }
                             }
                         }
 
-                        // Record Mutation
                         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'mutations'), {
-                            assetId: asset.id,
-                            namaBarang: asset.nama,
-                            merk: asset.merk,
-                            tipe,
-                            jumlah,
-                            dari: asset.lokasi,
-                            ke: tipe === 'Mutasi' ? ke : '-',
-                            keterangan,
-                            tanggalMutasi: tanggalMutasi,
-                            createdAt: serverTimestamp()
+                            assetId: asset.id, namaBarang: asset.nama, merk: asset.merk,
+                            tipe, jumlah, dari: asset.lokasi, ke: tipe === 'Mutasi' ? ke : '-',
+                            keterangan, tanggalMutasi: tanggalMutasi, createdAt: serverTimestamp()
                         });
                         showToast("Mutasi Berhasil diproses!");
                     }
-
                     switchTab('db-mutasi');
                 } catch (err) {
                     console.error(err);
@@ -1085,7 +1092,6 @@
                         <i class="fas fa-print"></i> Cetak PDF Riwayat
                     </button>
                 </div>
-
                 <div class="card-glass rounded-[2rem] overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left">
@@ -1122,7 +1128,6 @@
 
         const renderMutationsTableRows = (dataList) => {
             if (dataList.length === 0) return '<tr><td colspan="6" class="p-12 text-center text-gray-400">Belum ada riwayat mutasi.</td></tr>';
-            
             return dataList.map(m => `
                 <tr class="hover:bg-teal-50/30 transition">
                     <td class="px-6 py-4 text-xs text-gray-500">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
@@ -1162,21 +1167,15 @@
         };
 
         window.deleteMutationConfirm = (id) => {
-            customConfirm(
-                "Hapus Riwayat Mutasi", 
-                "Apakah Anda yakin ingin menghapus catatan mutasi ini? Tindakan ini tidak akan mengembalikan jumlah stok fisik barang.", 
-                async () => {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id));
-                    showToast("Catatan mutasi berhasil dihapus");
-                }, 
-                "danger"
-            );
+            customConfirm("Hapus Riwayat Mutasi", "Apakah Anda yakin ingin menghapus catatan mutasi ini? Tindakan ini tidak akan mengembalikan stok fisik.", async () => {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'mutations', id));
+                showToast("Catatan mutasi dihapus");
+            });
         };
 
         const renderBeritaAcara = (container) => {
             container.innerHTML = `
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                    <!-- Form Generator -->
                     <div class="lg:col-span-1">
                         <form id="form-ba-rusak" class="card-glass p-6 rounded-[2rem] space-y-4">
                             <h4 class="font-bold text-teal-900 border-b pb-2 mb-4"><i class="fas fa-print mr-2"></i>Buat Berita Acara</h4>
@@ -1185,7 +1184,7 @@
                                 <label class="text-xs font-bold text-gray-700">Pilih Aset Terdaftar <span class="text-red-500">*</span></label>
                                 <select id="ba-asset-id" required class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
                                     <option value="">-- Pilih Aset --</option>
-                                    ${assets.map(a => `<option value="${a.id}">${a.nama} (${a.merk}) - [Kode: ${a.kode || 'N/A'}]</option>`).join('')}
+                                    ${assets.map(a => `<option value="${a.id}">${a.nama} (${a.merk})</option>`).join('')}
                                 </select>
                             </div>
 
@@ -1197,73 +1196,46 @@
                             <div class="space-y-1">
                                 <label class="text-xs font-bold text-gray-700">Jenis/Klasifikasi Kerusakan <span class="text-red-500">*</span></label>
                                 <select id="ba-jenis-kerusakan" required class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm">
-                                    <option value="Rusak Ringan">Rusak Ringan (Bisa Diperbaiki Cepat)</option>
-                                    <option value="Rusak Sedang">Rusak Sedang (Perlu Suku Cadang)</option>
-                                    <option value="Rusak Berat / Total">Rusak Berat / Total (Tidak Layak Pakai)</option>
+                                    <option value="Rusak Ringan">Rusak Ringan</option>
+                                    <option value="Rusak Sedang">Rusak Sedang</option>
+                                    <option value="Rusak Berat / Total">Rusak Berat / Total</option>
                                 </select>
                             </div>
 
                             <div class="space-y-1">
-                                <label class="text-xs font-bold text-gray-700">Kronologi & Detail Kerusakan <span class="text-red-500">*</span></label>
-                                <textarea id="ba-detail" required rows="3" placeholder="Sebutkan kendala teknis / kronologi..." class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm"></textarea>
+                                <label class="text-xs font-bold text-gray-700">Kronologi & Detail <span class="text-red-500">*</span></label>
+                                <textarea id="ba-detail" required rows="3" class="w-full p-3 bg-gray-50 border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-sm"></textarea>
                             </div>
 
                             <p class="text-[10px] uppercase tracking-widest text-teal-700 font-bold mt-2">Daftar Penandatangan</p>
+                            <div class="space-y-1"><input type="text" id="ba-sign-kepala" required value="Siti Rahmawati, S.Kep." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg text-xs"></div>
+                            <div class="space-y-1"><input type="text" id="ba-sign-koor" required value="Adi Wijaya, S.E." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg text-xs"></div>
+                            <div class="space-y-1"><input type="text" id="ba-sign-manager" required value="dr. H. Tomos Junior, M.M." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg text-xs"></div>
 
-                            <div class="space-y-1">
-                                <label class="text-[11px] font-bold text-gray-600">Kepala Ruang (Penanggung Jawab)</label>
-                                <input type="text" id="ba-sign-kepala" required value="Siti Rahmawati, S.Kep." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-xs">
-                            </div>
-
-                            <div class="space-y-1">
-                                <label class="text-[11px] font-bold text-gray-600">Koordinator Rumah Tangga</label>
-                                <input type="text" id="ba-sign-koor" required value="Adi Wijaya, S.E." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-xs">
-                            </div>
-
-                            <div class="space-y-1">
-                                <label class="text-[11px] font-bold text-gray-600">Manager Umum</label>
-                                <input type="text" id="ba-sign-manager" required value="dr. H. Tomos Junior, M.M." class="w-full p-2.5 bg-gray-50 border-0 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none text-xs">
-                            </div>
-
-                            <button type="submit" class="w-full bg-teal-600 text-white font-bold py-3 rounded-xl hover:bg-teal-700 transition active:scale-[0.98] shadow-lg shadow-teal-100 flex items-center justify-center gap-2 text-sm">
+                            <button type="submit" class="w-full bg-teal-600 text-white font-bold py-3 rounded-xl hover:bg-teal-700 transition shadow-lg shadow-teal-100 flex items-center justify-center gap-2 text-sm">
                                 <i class="fas fa-file-pdf"></i> Cetak Berita Acara PDF
                             </button>
                         </form>
                     </div>
 
-                    <!-- DB Damage Listings -->
                     <div class="lg:col-span-2 space-y-6">
                         <div class="card-glass p-6 rounded-[2rem]">
-                            <h4 class="font-bold text-gray-800 mb-4"><i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>Aset Rusak Terdaftar di Database</h4>
+                            <h4 class="font-bold text-gray-800 mb-4"><i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>Aset Rusak Terdaftar</h4>
                             <div class="overflow-x-auto">
                                 <table class="w-full text-left text-xs">
-                                    <thead>
-                                        <tr class="bg-gray-100 text-gray-700">
-                                            <th class="p-3">Tanggal Lapor</th>
-                                            <th class="p-3">Nama Alat</th>
-                                            <th class="p-3">Kode/SN</th>
-                                            <th class="p-3">Lokasi</th>
-                                            <th class="p-3 text-center">Cetak</th>
-                                        </tr>
-                                    </thead>
+                                    <thead><tr class="bg-gray-100 text-gray-700"><th class="p-3">Tanggal</th><th class="p-3">Nama Alat</th><th class="p-3">Lokasi</th><th class="p-3 text-center">Cetak</th></tr></thead>
                                     <tbody class="divide-y divide-gray-100">
-                                        ${mutations.filter(m => m.tipe === 'Rusak').length === 0 ? '<tr><td colspan="5" class="p-8 text-center text-gray-400">Belum ada riwayat kerusakan dilaporkan di mutasi.</td></tr>' : 
-                                          mutations.filter(m => m.tipe === 'Rusak').map(m => {
-                                            const originalAsset = assets.find(a => a.id === m.assetId) || {};
-                                            return `
+                                        ${mutations.filter(m => m.tipe === 'Rusak').length === 0 ? '<tr><td colspan="4" class="p-8 text-center text-gray-400">Belum ada riwayat kerusakan.</td></tr>' : 
+                                          mutations.filter(m => m.tipe === 'Rusak').map(m => `
                                                 <tr class="hover:bg-teal-50/20 transition">
-                                                    <td class="p-3 text-gray-500">${m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
+                                                    <td class="p-3 text-gray-500">${m.tanggalMutasi || '-'}</td>
                                                     <td class="p-3 font-bold text-gray-800">${m.namaBarang}</td>
-                                                    <td class="p-3 font-mono">${originalAsset.kode || '-'}</td>
                                                     <td class="p-3"><span class="px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-bold text-[9px]">${m.dari}</span></td>
                                                     <td class="p-3 text-center">
-                                                        <button onclick="pilihAsetRusakUntukCetak('${m.id}')" class="bg-teal-100 text-teal-800 px-3 py-1 rounded-lg hover:bg-teal-200 transition font-bold text-[10px]">
-                                                            Gunakan Data
-                                                        </button>
+                                                        <button onclick="pilihAsetRusakUntukCetak('${m.id}')" class="bg-teal-100 text-teal-800 px-3 py-1 rounded-lg hover:bg-teal-200 transition font-bold text-[10px]">Gunakan Data</button>
                                                     </td>
                                                 </tr>
-                                            `;
-                                          }).join('')}
+                                          `).join('')}
                                     </tbody>
                                 </table>
                             </div>
@@ -1273,481 +1245,160 @@
             `;
 
             document.getElementById('ba-tanggal').value = new Date().toISOString().split('T')[0];
-
             document.getElementById('form-ba-rusak').onsubmit = (e) => {
                 e.preventDefault();
-                const assetId = document.getElementById('ba-asset-id').value;
-                const asset = assets.find(a => a.id === assetId);
-                
+                const asset = assets.find(a => a.id === document.getElementById('ba-asset-id').value);
                 if (!asset) return showToast("Pilih aset terlebih dahulu!", "warning");
-
-                const reportData = {
-                    nama: asset.nama,
-                    merk: asset.merk,
-                    kode: asset.kode || '-',
-                    lokasi: asset.lokasi,
-                    tanggal: document.getElementById('ba-tanggal').value,
-                    tanggalBeli: asset.tanggal || '-',
-                    jenisKerusakan: document.getElementById('ba-jenis-kerusakan').value,
-                    detail: document.getElementById('ba-detail').value,
-                    signKepala: document.getElementById('ba-sign-kepala').value,
-                    signKoor: document.getElementById('ba-sign-koor').value,
-                    signManager: document.getElementById('ba-sign-manager').value
-                };
-
-                exportBeritaAcaraPDF(reportData);
+                exportBeritaAcaraPDF({
+                    nama: asset.nama, merk: asset.merk, kode: asset.kode || '-', lokasi: asset.lokasi,
+                    tanggal: document.getElementById('ba-tanggal').value, tanggalBeli: asset.tanggal || '-',
+                    jenisKerusakan: document.getElementById('ba-jenis-kerusakan').value, detail: document.getElementById('ba-detail').value,
+                    signKepala: document.getElementById('ba-sign-kepala').value, signKoor: document.getElementById('ba-sign-koor').value, signManager: document.getElementById('ba-sign-manager').value
+                });
             };
         };
 
         window.pilihAsetRusakUntukCetak = (mutationId) => {
             const mut = mutations.find(m => m.id === mutationId);
             if (!mut) return;
-
             const asset = assets.find(a => a.id === mut.assetId);
-            if (asset) {
-                document.getElementById('ba-asset-id').value = asset.id;
-            }
+            if (asset) document.getElementById('ba-asset-id').value = asset.id;
             document.getElementById('ba-tanggal').value = mut.tanggalMutasi || new Date().toISOString().split('T')[0];
             document.getElementById('ba-detail').value = mut.keterangan || "";
-            showToast("Data dari database berhasil dimuat! Silakan tinjau kembali sebelum cetak.");
+            showToast("Data dari database berhasil dimuat!");
         };
 
         window.cetakBaKerusakanLangsung = (mutationId) => {
             const mut = mutations.find(m => m.id === mutationId);
             if (!mut) return;
-
             const asset = assets.find(a => a.id === mut.assetId) || { kode: '-', tanggal: '-' };
-            
-            const reportData = {
-                nama: mut.namaBarang,
-                merk: mut.merk,
-                kode: asset.kode || '-',
-                lokasi: mut.dari,
-                tanggal: mut.tanggalMutasi || new Date().toISOString().split('T')[0],
-                tanggalBeli: asset.tanggal || '-',
-                jenisKerusakan: "Rusak (Melalui Riwayat)",
-                detail: mut.keterangan || "Dilaporkan melalui manajemen mutasi.",
-                signKepala: "Siti Rahmawati, S.Kep.",
-                signKoor: "Adi Wijaya, S.E.",
-                signManager: "dr. H. Tomos Junior, M.M."
-            };
-
-            exportBeritaAcaraPDF(reportData);
+            exportBeritaAcaraPDF({
+                nama: mut.namaBarang, merk: mut.merk, kode: asset.kode || '-', lokasi: mut.dari,
+                tanggal: mut.tanggalMutasi || new Date().toISOString().split('T')[0], tanggalBeli: asset.tanggal || '-',
+                jenisKerusakan: "Rusak (Melalui Riwayat)", detail: mut.keterangan || "Dilaporkan melalui manajemen mutasi.",
+                signKepala: "Siti Rahmawati, S.Kep.", signKoor: "Adi Wijaya, S.E.", signManager: "dr. H. Tomos Junior, M.M."
+            });
         };
 
         const exportBeritaAcaraPDF = (data) => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
 
-            // --- KOP SURAT RSU DADI KELUARGA (BLUE TIMES NEW ROMAN) ---
-            doc.setFontSize(22);
-            doc.setTextColor(0, 51, 204); 
-            doc.setFont("times", "bold");
+            doc.setFontSize(22); doc.setTextColor(0, 51, 204); doc.setFont("times", "bold");
             doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 18, { align: 'center' });
-            
-            doc.setFontSize(9);
-            doc.setTextColor(0, 51, 204); 
-            doc.setFont("times", "normal");
+            doc.setFontSize(9); doc.setFont("times", "normal");
             doc.text("Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan, Kab. Banyumas", 105, 23, { align: 'center' });
             doc.text("Telp: (0281) 6844005 • Email: info@rsudadikeluarga.co.id • Purwokerto 53145", 105, 27, { align: 'center' });
             
-            // Double divider line in blue color
-            doc.setDrawColor(0, 51, 204);
-            doc.setLineWidth(0.8);
-            doc.line(15, 30, 195, 30);
-            doc.setLineWidth(0.2);
-            doc.line(15, 31.2, 195, 31.2);
+            doc.setDrawColor(0, 51, 204); doc.setLineWidth(0.8); doc.line(15, 30, 195, 30);
+            doc.setLineWidth(0.2); doc.line(15, 31.2, 195, 31.2);
 
-            // --- JUDUL DOKUMEN ---
-            doc.setFontSize(14);
-            doc.setTextColor(0);
-            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14); doc.setTextColor(0); doc.setFont("helvetica", "bold");
             doc.text("BERITA ACARA KERUSAKAN ASET NON-MEDIS", 105, 42, { align: 'center' });
-            
-            doc.setFontSize(10);
-            doc.setFont("helvetica", "normal");
-            const rawYear = new Date(data.tanggal).getFullYear() || 2026;
-            const randomDocNo = Math.floor(Math.random() * 800) + 100;
-            doc.text(`Nomor: BA-RSDK/UM-RT/${rawYear}/${randomDocNo}`, 105, 47, { align: 'center' });
+            doc.setFontSize(10); doc.setFont("helvetica", "normal");
+            doc.text(`Nomor: BA-RSDK/UM-RT/${new Date(data.tanggal).getFullYear()}/${Math.floor(Math.random() * 800) + 100}`, 105, 47, { align: 'center' });
 
-            // --- KATA PENGANTAR ---
-            doc.setFontSize(10);
-            doc.text("Yang bertanda tangan di bawah ini menerangkan dengan sebenarnya mengenai kondisi kerusakan fisik", 15, 58);
-            doc.text("aset rumah sakit non-medis yang tertera di bawah ini:", 15, 63);
-
-            // --- TABEL DETAIL BARANG ---
-            const daysArr = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
-            const monthsArr = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-            
-            const dateObj = new Date(data.tanggal);
-            const dayName = daysArr[dateObj.getDay()] || "-";
-            const formattedDateStr = `${dayName}, ${dateObj.getDate()} ${monthsArr[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
-
-            let formattedBeliStr = "-";
-            if (data.tanggalBeli && data.tanggalBeli !== "-") {
-                const dateBeliObj = new Date(data.tanggalBeli);
-                if (!isNaN(dateBeliObj)) {
-                    formattedBeliStr = `${dateBeliObj.getDate()} ${monthsArr[dateBeliObj.getMonth()]} ${dateBeliObj.getFullYear()}`;
-                } else {
-                    formattedBeliStr = data.tanggalBeli;
-                }
-            }
-
-            const detailTableRows = [
-                ["Nama Aset / Alat", data.nama],
-                ["Merk / Tipe", data.merk],
-                ["Kode Inventaris / SN", data.kode],
-                ["Tanggal Pembelian Alat", formattedBeliStr],
-                ["Lokasi / Ruangan", data.lokasi],
-                ["Tanggal Temuan Kerusakan", formattedDateStr],
-                ["Klasifikasi Kerusakan", data.jenisKerusakan],
-                ["Deskripsi & Kronologi Kerusakan", data.detail]
-            ];
+            doc.text("Yang bertanda tangan di bawah ini menerangkan dengan sebenarnya mengenai kondisi kerusakan fisik aset rumah sakit non-medis yang tertera di bawah ini:", 15, 58, { maxWidth: 180 });
 
             doc.autoTable({
                 startY: 68,
-                margin: { left: 15, right: 15 },
-                body: detailTableRows,
-                theme: 'grid',
-                styles: { fontSize: 10, cellPadding: 4 },
-                columnStyles: {
-                    0: { cellWidth: 55, fontStyle: 'bold', fillColor: [243, 244, 246] },
-                    1: { cellWidth: 125 }
-                }
+                head: [['Nama Alat', 'Merk/Tipe', 'Kode/SN', 'Tgl Beli', 'Lokasi Asal']],
+                body: [[data.nama, data.merk, data.kode, data.tanggalBeli, data.lokasi]],
+                theme: 'grid', headStyles: { fillColor: [13, 148, 136] }, styles: { fontSize: 9 }
             });
 
-            // --- KATA PENUTUP ---
-            const finalTableY = doc.lastAutoTable.finalY;
-            doc.setFontSize(10);
-            doc.text("Demikian Berita Acara Kerusakan ini dibuat dengan sebenar-benarnya untuk digunakan sebagai landasan", 15, finalTableY + 12);
-            doc.text("tindak lanjut perbaikan atau pengajuan penggantian aset sesuai regulasi sarana prasarana RSU Dadi Keluarga.", 15, finalTableY + 17);
+            let finalY = doc.lastAutoTable.finalY + 10;
+            doc.setFont("helvetica", "bold"); doc.text("Detail & Klasifikasi Kerusakan:", 15, finalY);
+            doc.setFont("helvetica", "normal"); doc.text(`Klasifikasi: ${data.jenisKerusakan}`, 15, finalY + 5);
+            doc.text(`Keterangan: ${data.detail}`, 15, finalY + 10, { maxWidth: 180 });
 
-            // --- TANDA TANGAN (SIGNATURE LAYOUT) ---
-            const sigY = finalTableY + 32;
+            finalY += 30; doc.text(`Purwokerto, ${new Date().toLocaleDateString('id-ID')}`, 135, finalY);
+            finalY += 10; doc.text("Koordinator RT", 30, finalY, { align: 'center' }); doc.text("Kepala Ruang", 105, finalY, { align: 'center' }); doc.text("Manager Umum", 175, finalY, { align: 'center' });
+            finalY += 25; doc.setFont("helvetica", "bold");
+            doc.text(data.signKoor, 30, finalY, { align: 'center' }); doc.text(data.signKepala, 105, finalY, { align: 'center' }); doc.text(data.signManager, 175, finalY, { align: 'center' });
 
-            // Header Signatures
-            doc.setFont("helvetica", "normal");
-            doc.text("Mengetahui,", 105, sigY, { align: 'center' });
-            
-            doc.text("Melaporkan,", 35, sigY + 6, { align: 'center' });
-            doc.setFont("helvetica", "bold");
-            doc.text("Kepala Ruang", 35, sigY + 11, { align: 'center' });
-
-            doc.setFont("helvetica", "normal");
-            doc.text("Menyetujui,", 105, sigY + 6, { align: 'center' });
-            doc.setFont("helvetica", "bold");
-            doc.text("Koordinator Rumah Tangga", 105, sigY + 11, { align: 'center' });
-
-            doc.setFont("helvetica", "normal");
-            doc.text("Mengesahkan,", 170, sigY + 6, { align: 'center' });
-            doc.setFont("helvetica", "bold");
-            doc.text("Manager Umum", 170, sigY + 11, { align: 'center' });
-
-            // Space for hand-writing
-            const signLinesY = sigY + 38;
-            doc.setFont("helvetica", "bold");
-            doc.text(`( ${data.signKepala} )`, 35, signLinesY, { align: 'center' });
-            doc.text(`( ${data.signKoor} )`, 105, signLinesY, { align: 'center' });
-            doc.text(`( ${data.signManager} )`, 170, signLinesY, { align: 'center' });
-
-            doc.save(`Berita_Acara_Rusak_${data.nama.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
-            showToast("Berita Acara Kerusakan berhasil dicetak!");
-        };
-
-        // --- NEW: Export Mutations History to professional PDF with Hospital Kop ---
-        window.exportMutationsToPDF = () => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-
-            // --- KOP SURAT RSU DADI KELUARGA (BLUE TIMES NEW ROMAN) ---
-            doc.setFontSize(22);
-            doc.setTextColor(0, 51, 204); 
-            doc.setFont("times", "bold");
-            doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 18, { align: 'center' });
-            
-            doc.setFontSize(9);
-            doc.setTextColor(0, 51, 204); 
-            doc.setFont("times", "normal");
-            doc.text("Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan, Kab. Banyumas", 105, 23, { align: 'center' });
-            doc.text("Telp: (0281) 6844005 • Email: info@rsudadikeluarga.co.id • Purwokerto 53145", 105, 27, { align: 'center' });
-            
-            // Double divider line in blue color
-            doc.setDrawColor(0, 51, 204);
-            doc.setLineWidth(0.8);
-            doc.line(15, 30, 195, 30);
-            doc.setLineWidth(0.2);
-            doc.line(15, 31.2, 195, 31.2);
-
-            // --- JUDUL LAPORAN ---
-            doc.setFontSize(14);
-            doc.setTextColor(0);
-            doc.setFont("helvetica", "bold");
-            doc.text("LAPORAN RIWAYAT MUTASI & STATUS ASET", 15, 42);
-            
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "normal");
-            doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')} • Bagian Rumah Tangga`, 15, 47);
-
-            // --- DATA TABLE ---
-            const tableRows = mutations.map((m, idx) => {
-                const dateStr = m.tanggalMutasi ? new Date(m.tanggalMutasi).toLocaleDateString('id-ID') : new Date(m.createdAt?.seconds * 1000).toLocaleDateString('id-ID');
-                const movementStr = m.tipe === 'Mutasi' ? `${m.dari} -> ${m.ke}` : m.dari;
-                return [
-                    idx + 1,
-                    dateStr,
-                    `${m.namaBarang} (${m.merk})`,
-                    m.tipe,
-                    movementStr,
-                    m.jumlah,
-                    m.keterangan || '-'
-                ];
-            });
-
-            doc.autoTable({
-                startY: 52,
-                head: [['No', 'Tanggal', 'Nama Aset', 'Status/Tipe', 'Asal & Tujuan Ruang', 'Qty', 'Keterangan']],
-                body: tableRows,
-                theme: 'striped',
-                headStyles: { fillColor: [0, 51, 204] }, // Match Blue Brand Color
-                styles: { fontSize: 8, cellPadding: 3 },
-                columnStyles: {
-                    0: { cellWidth: 10 },
-                    1: { cellWidth: 22 },
-                    2: { cellWidth: 45 },
-                    3: { cellWidth: 20 },
-                    4: { cellWidth: 45 },
-                    5: { cellWidth: 12, hAlign: 'center' },
-                    6: { cellWidth: 26 }
-                }
-            });
-
-            // --- SIGNATURES ---
-            const finalY = doc.lastAutoTable.finalY + 15;
-            doc.setFontSize(9);
-            doc.text("Purwokerto, " + new Date().toLocaleDateString('id-ID'), 140, finalY);
-            doc.text("Pencatat Logistik,", 30, finalY + 5);
-            doc.text("Koordinator Rumah Tangga,", 140, finalY + 5);
-
-            doc.text("( ____________________ )", 30, finalY + 28);
-            doc.text("Adi Wijaya, S.E.", 140, finalY + 28, { fontStyle: 'bold' });
-            doc.text("( ____________________ )", 140, finalY + 33);
-
-            doc.save(`Laporan_Riwayat_Mutasi_${Date.now()}.pdf`);
-            showToast("Laporan Riwayat Mutasi berhasil dicetak ke PDF!");
-        };
-
-        const renderImportExport = (container) => {
-            container.innerHTML = `
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                    <div class="card-glass p-8 rounded-[2rem] flex flex-col items-center text-center">
-                        <div class="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mb-6">
-                            <i class="fas fa-file-export"></i>
-                        </div>
-                        <h4 class="text-xl font-bold text-gray-800 mb-2">Export Data Aset</h4>
-                        <p class="text-sm text-gray-500 mb-8">Unduh semua data aset yang terdaftar dalam format Excel (.xlsx) untuk laporan bulanan.</p>
-                        <button onclick="exportToExcel()" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-100">
-                            Unduh Database Excel
-                        </button>
-                    </div>
-
-                    <div class="card-glass p-8 rounded-[2rem] flex flex-col items-center text-center">
-                        <div class="w-20 h-20 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mb-6">
-                            <i class="fas fa-file-import"></i>
-                        </div>
-                        <h4 class="text-xl font-bold text-gray-800 mb-2">Import Data Massal</h4>
-                        <p class="text-sm text-gray-500 mb-8">Unggah file Excel dengan kolom yang sesuai untuk memasukkan banyak data aset sekaligus ke cloud.</p>
-                        <label class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition shadow-lg shadow-blue-100 cursor-pointer">
-                            <i class="fas fa-upload mr-2"></i> Pilih File Excel
-                            <input type="file" id="excel-input" accept=".xlsx, .xls" class="hidden">
-                        </label>
-                        <button onclick="downloadTemplate()" class="mt-4 text-xs text-blue-600 font-bold hover:underline">Download Template Excel</button>
-                    </div>
-                </div>
-            `;
-
-            document.getElementById('excel-input').onchange = (e) => handleImport(e);
+            doc.save(`BA_Rusak_${data.nama}_${new Date().getTime()}.pdf`);
         };
 
         const renderMasterRuangan = (container) => {
             container.innerHTML = `
-                <div class="max-w-2xl mx-auto space-y-8">
-                    <div class="card-glass p-8 rounded-[2rem]">
-                        <h4 class="font-bold text-gray-800 mb-6">Tambah Ruangan / Unit</h4>
-                        <div class="flex gap-4">
-                            <input type="text" id="master-room-name" placeholder="Nama Ruangan Baru..." class="flex-1 p-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-teal-500 transition">
-                            <button onclick="addRoom()" class="bg-teal-600 text-white px-8 rounded-2xl font-bold hover:bg-teal-700 transition">Tambah</button>
+                <div class="max-w-2xl mx-auto space-y-6">
+                    <div class="card-glass p-6 rounded-3xl">
+                        <h4 class="font-bold mb-4">Tambah Ruangan Baru</h4>
+                        <form id="form-ruangan" class="flex gap-4">
+                            <input type="text" id="ruangan-nama" required placeholder="Nama Ruangan..." class="flex-1 p-3 bg-gray-50 rounded-xl focus:ring-teal-500 outline-none border-0">
+                            <button type="submit" class="bg-teal-600 text-white px-6 rounded-xl font-bold hover:bg-teal-700 transition">Simpan</button>
+                        </form>
+                    </div>
+                    <div class="card-glass p-6 rounded-3xl">
+                        <h4 class="font-bold mb-4">Daftar Ruangan Terdaftar</h4>
+                        <div class="space-y-2">
+                            ${rooms.map(r => `
+                                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <span class="font-bold text-gray-700">${r.nama}</span>
+                                    <button onclick="deleteRoom('${r.id}')" class="text-red-500 hover:text-red-700 p-2"><i class="fas fa-trash"></i></button>
+                                </div>
+                            `).join('')}
                         </div>
                     </div>
+                </div>
+            `;
+            document.getElementById('form-ruangan').onsubmit = async (e) => {
+                e.preventDefault();
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { nama: document.getElementById('ruangan-nama').value });
+                showToast("Ruangan berhasil ditambahkan");
+                document.getElementById('ruangan-nama').value = '';
+            };
+        };
 
-                    <div class="card-glass rounded-[2rem] overflow-hidden">
-                        <table class="w-full text-left">
-                            <tbody class="divide-y divide-gray-100">
-                                ${rooms.map(r => `
-                                    <tr class="group">
-                                        <td class="px-8 py-5">
-                                            <div class="flex items-center gap-4">
-                                                <div class="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center">
-                                                    <i class="fas fa-door-open text-xs"></i>
-                                                </div>
-                                                <span class="font-bold text-gray-700">${r.nama}</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-8 py-5 text-right">
-                                            <button onclick="deleteRoomConfirm('${r.id}')" class="text-red-400 hover:text-red-600 transition opacity-0 group-hover:opacity-100"><i class="fas fa-trash"></i></button>
-                                        </td>
-                                    </tr>
-                                `).join(rooms.length === 0 ? '<tr><td class="p-10 text-center text-gray-400">Belum ada ruangan terdaftar.</td></tr>' : '')}
-                            </tbody>
-                        </table>
-                    </div>
+        window.deleteRoom = (id) => customConfirm("Hapus Ruangan", "Yakin hapus ruangan ini?", async () => {
+            await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id)); showToast("Ruangan dihapus");
+        });
+
+        const renderImportExport = (container) => {
+            container.innerHTML = `
+                <div class="max-w-xl mx-auto card-glass p-8 rounded-3xl text-center space-y-6">
+                    <h4 class="font-bold text-gray-800">Export Excel Database</h4>
+                    <p class="text-sm text-gray-500">Gunakan fitur ini untuk membackup data seluruh aset ke format spreadsheet Excel (.xlsx).</p>
+                    <button onclick="exportToExcel()" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">
+                        <i class="fas fa-file-excel mr-2"></i> Download Data Aset
+                    </button>
                 </div>
             `;
         };
 
-        window.addRoom = async () => {
-            const name = document.getElementById('master-room-name').value;
-            if (!name) return;
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'rooms'), { nama: name });
-            document.getElementById('master-room-name').value = "";
-            showToast("Ruangan berhasil ditambahkan");
-        };
-
-        window.deleteRoomConfirm = (id) => {
-            customConfirm(
-                "Hapus Ruangan", 
-                "Hapus ruangan ini? Aset yang berada di ruangan ini tidak akan terhapus namun lokasinya akan menjadi tidak valid.", 
-                async () => {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id));
-                    showToast("Ruangan dihapus");
-                }, 
-                "danger"
-            );
-        };
-
         window.exportToExcel = () => {
-            const worksheet = XLSX.utils.json_to_sheet(assets.map(({id, foto, createdAt, updatedAt, ...rest}) => rest));
-            const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Aset Rumah Sakit");
-            XLSX.writeFile(workbook, `SIMARS_Export_${new Date().toLocaleDateString()}.xlsx`);
-        };
-
-        window.downloadTemplate = () => {
-            const data = [{
-                nama: "Contoh Nama Alat",
-                merk: "Merk/Tipe",
-                kode: "KodeSN123",
-                tanggal: "YYYY-MM-DD",
-                jumlah: 1,
-                harga: 1000000,
-                lokasi: rooms[0]?.nama || "Pilih Ruangan",
-                vendor: "Nama Supplier"
-            }];
-            const ws = XLSX.utils.json_to_sheet(data);
+            const ws = XLSX.utils.json_to_sheet(assets.map(a => ({ 
+                Nama: a.nama, Merk: a.merk, Kode: a.kode, Stok: a.jumlah, Lokasi: a.lokasi, Tanggal_Beli: a.tanggal, Harga: a.harga, Vendor: a.vendor 
+            })));
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Template");
-            XLSX.writeFile(wb, "Template_SIMARS.xlsx");
+            XLSX.utils.book_append_sheet(wb, ws, "Assets");
+            XLSX.writeFile(wb, "Database_Aset_Non_Medis.xlsx");
         };
 
-        const handleImport = (e) => {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = async (evt) => {
-                const data = evt.target.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(sheet);
-                
-                showToast(`Memproses ${rows.length} data...`);
-                for (const row of rows) {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'assets'), {
-                        ...row,
-                        foto: "",
-                        createdAt: serverTimestamp()
-                    });
-                }
-                showToast("Import Berhasil!");
-                switchTab('database');
-            };
-            reader.readAsBinaryString(file);
+        window.exportToPDF = (roomName) => {
+            if(!roomName) return showToast("Pilih ruangan terlebih dahulu!", "warning");
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            const filtered = assets.filter(a => a.lokasi === roomName);
+            doc.setFontSize(16); doc.text(`Daftar Aset Ruangan: ${roomName}`, 14, 20);
+            doc.autoTable({ startY: 30, head: [['Nama Alat', 'Merk', 'Kode', 'Stok']], body: filtered.map(a => [a.nama, a.merk, a.kode || '-', a.jumlah]) });
+            doc.save(`Aset_Ruangan_${roomName}.pdf`);
         };
 
-        const exportToPDF = (roomName) => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF('p', 'mm', 'a4');
-            const data = assets.filter(a => a.lokasi === roomName);
-            
-            // Header Rumah Sakit (KOP)
-            doc.setFontSize(25);
-            doc.setTextColor(13, 148, 136); // Teal
-            doc.text("RSU DADI KELUARGA PURWOKERTO", 105, 15, { align: 'center' });
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text("Jl.Sultan Agung NO:8A Teluk-Purwokerto Selatan • Telp: (021) 555-00000", 105, 20, { align: 'center' });
-            doc.line(20, 25, 190, 25);
-
-            // Judul Dokumen
-            doc.setFontSize(14);
-            doc.setTextColor(0);
-            doc.text(`LAPORAN INVENTARIS ASET: ${roomName.toUpperCase()}`, 20, 35);
-            doc.setFontSize(9);
-            doc.text(`Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 20, 40);
-
-            // Tabel
-            const tableData = data.map((a, i) => [
-                i + 1, 
-                a.nama, 
-                a.merk, 
-                a.kode || '-', 
-                a.jumlah, 
-                `Rp ${parseInt(a.harga).toLocaleString()}`
-            ]);
-
-            doc.autoTable({
-                startY: 45,
-                head: [['No', 'Nama Barang', 'Merk/Tipe', 'Kode Inventaris', 'Qty', 'Harga Satuan']],
-                body: tableData,
-                theme: 'striped',
-                headStyles: { fillColor: [13, 148, 136] },
-                styles: { fontSize: 8 }
-            });
-
-            // Tanda Tangan
-            const finalY = doc.lastAutoTable.finalY + 20;
-            doc.text("Pencatat Barang,", 30, finalY);
-            doc.text("( ____________________ )", 30, finalY + 25);
-            
-            doc.text("Penanggung Jawab Ruangan,", 130, finalY);
-            doc.text("( ____________________ )", 130, finalY + 25);
-
-            doc.save(`Aset_${roomName}_${Date.now()}.pdf`);
+        window.exportMutationsToPDF = () => {
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            doc.setFontSize(16); doc.text(`Riwayat Mutasi & Perubahan Status`, 14, 20);
+            doc.autoTable({ startY: 30, head: [['Tanggal', 'Barang', 'Tipe', 'Dari', 'Ke', 'Qty']], body: mutations.map(m => [m.tanggalMutasi || '-', m.namaBarang, m.tipe, m.dari, m.ke, m.jumlah]) });
+            doc.save(`Riwayat_Mutasi.pdf`);
         };
 
-        // --- Utility ---
-        window.closeModal = () => {
-            document.getElementById('modal-overlay').style.display = 'none';
-        };
-
-        const showToast = (msg, type = "success") => {
-            const toast = document.createElement('div');
-            toast.className = `fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 rounded-2xl text-white font-bold shadow-2xl z-[200] transition transform translate-y-10 opacity-0 ${type === 'success' ? 'bg-teal-600' : type === 'error' ? 'bg-red-600' : 'bg-amber-600'}`;
-            toast.innerText = msg;
-            document.body.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.classList.remove('translate-y-10', 'opacity-0');
-            }, 100);
-            
-            setTimeout(() => {
-                toast.classList.add('translate-y-10', 'opacity-0');
-                setTimeout(() => toast.remove(), 500);
-            }, 3000);
-        };
-
-        // Init
-        document.getElementById('current-date').innerText = new Date().toLocaleString('id-ID');
+        setInterval(() => {
+            const dateEl = document.getElementById('current-date');
+            if (dateEl) dateEl.innerText = new Date().toLocaleString('id-ID');
+        }, 1000);
+        
         initAuth();
         switchTab('dashboard');
-
     </script>
 </body>
 </html>
