@@ -10,7 +10,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://unpkg.com/@html5-qrcode/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -238,6 +238,7 @@
         let mutations = [];
         let rooms = [];
         let currentTab = 'dashboard';
+        window.globalQrScanner = null;
 
         // --- Custom Utility Functions ---
         window.showToast = (message, type = 'success') => {
@@ -313,6 +314,16 @@
 
         // --- Navigation Logic ---
         window.switchTab = (tabId) => {
+            // Matikan scanner jika tab berpindah
+            if (window.globalQrScanner) {
+                try {
+                    window.globalQrScanner.stop().then(() => {
+                        window.globalQrScanner.clear();
+                        window.globalQrScanner = null;
+                    }).catch(e => console.log("Scanner stop error", e));
+                } catch(e) {}
+            }
+
             currentTab = tabId;
             document.querySelectorAll('aside nav button').forEach(btn => btn.classList.remove('sidebar-active'));
             const activeBtn = document.getElementById(`nav-${tabId}`);
@@ -673,7 +684,9 @@
                             <button id="btn-scan" class="w-full bg-teal-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 shadow-xl shadow-teal-100 hover:bg-teal-700 transition">
                                 <i class="fas fa-barcode"></i> Scan Kode Batang
                             </button>
-                            <div id="reader" class="overflow-hidden rounded-2xl bg-black hidden mt-4"></div>
+                            <div id="reader-container" class="hidden overflow-hidden rounded-2xl bg-black mt-4 w-full">
+                                <div id="reader" class="w-full"></div>
+                            </div>
                         </div>
                     </div>
 
@@ -686,7 +699,6 @@
             const input = document.getElementById('search-input');
             const resultDiv = document.getElementById('search-result');
             const listContainer = document.getElementById('search-list-container');
-            let html5QrCode = null;
 
             // Global function to select from search list
             window.selectSearchAsset = (id) => {
@@ -732,20 +744,29 @@
             };
 
             document.getElementById('btn-scan').onclick = () => {
-                const reader = document.getElementById('reader');
-                reader.classList.toggle('hidden');
+                const readerContainer = document.getElementById('reader-container');
+                const isHidden = readerContainer.classList.contains('hidden');
                 
-                if (!html5QrCode) {
-                    html5QrCode = new Html5Qrcode("reader");
-                }
-
-                if (reader.classList.contains('hidden')) {
-                    html5QrCode.stop().catch(err => console.error(err));
+                if (!isHidden) {
+                    // Berhenti melakukan scan
+                    if (window.globalQrScanner) {
+                        window.globalQrScanner.stop().then(() => {
+                            readerContainer.classList.add('hidden');
+                            window.globalQrScanner.clear();
+                            window.globalQrScanner = null;
+                        }).catch(err => console.error(err));
+                    } else {
+                        readerContainer.classList.add('hidden');
+                    }
                 } else {
+                    // Mulai proses scan
                     listContainer.classList.add('hidden');
                     resultDiv.classList.add('hidden');
+                    readerContainer.classList.remove('hidden');
                     
-                    html5QrCode.start(
+                    window.globalQrScanner = new Html5Qrcode("reader");
+                    
+                    window.globalQrScanner.start(
                         { facingMode: "environment" },
                         { fps: 10, qrbox: { width: 250, height: 250 } },
                         (decodedText) => {
@@ -753,18 +774,21 @@
                             const found = assets.find(a => a.kode === decodedText);
                             if (found) {
                                 showAssetDetail(found);
-                                html5QrCode.stop().then(() => {
-                                    reader.classList.add('hidden');
+                                window.globalQrScanner.stop().then(() => {
+                                    readerContainer.classList.add('hidden');
+                                    window.globalQrScanner.clear();
+                                    window.globalQrScanner = null;
                                 }).catch(err => console.error(err));
                             } else {
                                 showToast("Kode batang tidak terdaftar di database", "warning");
                             }
                         },
                         (errorMessage) => {
-                            // Ignored background scan errors
+                            // Pesan error background (diabaikan agar tidak spam console)
                         }
                     ).catch(err => {
                         console.error(err);
+                        readerContainer.classList.add('hidden');
                         showToast("Kamera tidak dapat diakses. Pastikan izin telah diberikan.", "error");
                     });
                 }
