@@ -147,6 +147,10 @@
                 <button onclick="switchTab('db-mutasi')" id="nav-db-mutasi" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
                     <i class="fas fa-history w-5"></i> Riwayat Mutasi
                 </button>
+                <!-- Menu Baru Lacak Barang -->
+                <button onclick="switchTab('lacak-barang')" id="nav-lacak-barang" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
+                    <i class="fas fa-route w-5"></i> Lacak Barang
+                </button>
                 <button onclick="switchTab('berita-acara')" id="nav-berita-acara" class="w-full flex items-center gap-3 p-3 rounded-xl transition hover:bg-white/10">
                     <i class="fas fa-file-signature w-5"></i> BA Kerusakan
                 </button>
@@ -337,6 +341,7 @@
                 'ruangan': 'Manajemen Aset Ruangan',
                 'input-mutasi': 'Mutasi & Perubahan Status',
                 'db-mutasi': 'Riwayat Mutasi Aset',
+                'lacak-barang': 'Lacak Riwayat Barang',
                 'berita-acara': 'Berita Acara Kerusakan Aset',
                 'import-export': 'Import & Export Excel',
                 'master-ruangan': 'Master Ruangan'
@@ -352,10 +357,11 @@
                 case 'dashboard': renderDashboard(container); break;
                 case 'input-aset': renderInputAset(container); break;
                 case 'database': renderDatabase(container); break;
-                case 'pencarian': renderPencarian(container); break; // Diperbarui
+                case 'pencarian': renderPencarian(container); break;
                 case 'ruangan': renderRuangan(container); break;
-                case 'input-mutasi': renderInputMutasi(container); break; // Diperbarui
+                case 'input-mutasi': renderInputMutasi(container); break;
                 case 'db-mutasi': renderDBMutasi(container); break;
+                case 'lacak-barang': renderLacakBarang(container); break;
                 case 'berita-acara': renderBeritaAcara(container); break;
                 case 'import-export': renderImportExport(container); break;
                 case 'master-ruangan': renderMasterRuangan(container); break;
@@ -700,26 +706,24 @@
             const resultDiv = document.getElementById('search-result');
             const listContainer = document.getElementById('search-list-container');
 
-            // Global function to select from search list
             window.selectSearchAsset = (id) => {
                 const asset = assets.find(a => a.id === id);
                 if (asset) {
                     listContainer.classList.add('hidden');
-                    input.value = asset.nama; // Fill input with selected name
+                    input.value = asset.nama;
                     showAssetDetail(asset);
                 }
             };
 
             input.oninput = (e) => {
                 const term = e.target.value.toLowerCase();
-                resultDiv.classList.add('hidden'); // Sembunyikan detail saat mengetik ulang
+                resultDiv.classList.add('hidden');
                 
                 if (term.length < 2) {
                     listContainer.classList.add('hidden');
                     return;
                 }
 
-                // Cari barang berdasarkan nama, kode, atau merk
                 const foundAssets = assets.filter(a => 
                     a.nama.toLowerCase().includes(term) || 
                     (a.kode && a.kode.toLowerCase().includes(term)) ||
@@ -748,7 +752,6 @@
                 const isHidden = readerContainer.classList.contains('hidden');
                 
                 if (!isHidden) {
-                    // Berhenti melakukan scan
                     if (window.globalQrScanner) {
                         window.globalQrScanner.stop().then(() => {
                             readerContainer.classList.add('hidden');
@@ -759,7 +762,6 @@
                         readerContainer.classList.add('hidden');
                     }
                 } else {
-                    // Mulai proses scan
                     listContainer.classList.add('hidden');
                     resultDiv.classList.add('hidden');
                     readerContainer.classList.remove('hidden');
@@ -783,9 +785,7 @@
                                 showToast("Kode batang tidak terdaftar di database", "warning");
                             }
                         },
-                        (errorMessage) => {
-                            // Pesan error background (diabaikan agar tidak spam console)
-                        }
+                        (errorMessage) => {}
                     ).catch(err => {
                         console.error(err);
                         readerContainer.classList.add('hidden');
@@ -862,6 +862,146 @@
                 </div>
             `;
         };
+
+        // --- IMPLEMENTASI MENU BARU: LACAK BARANG ---
+        const renderLacakBarang = (container) => {
+            container.innerHTML = `
+                <div class="max-w-4xl mx-auto space-y-6">
+                    <div class="card-glass p-8 rounded-[2rem] space-y-6">
+                        <div class="flex items-center gap-3 border-b pb-4">
+                            <div class="w-12 h-12 rounded-2xl bg-teal-100 flex items-center justify-center text-teal-600">
+                                <i class="fas fa-route text-xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-gray-800 text-lg">Pelacakan Riwayat Barang</h4>
+                                <p class="text-xs text-gray-500">Pilih ruangan dan nama barang untuk melihat rekam jejak lengkap dari pembelian hingga mutasi.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">Filter Ruangan</label>
+                                <select id="lacak-filter-ruangan" class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none text-sm shadow-sm">
+                                    <option value="">-- Semua Ruangan --</option>
+                                    ${rooms.map(r => `<option value="${r.nama}">${r.nama}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-xs font-bold text-gray-700 uppercase tracking-wider">Pilih Nama Barang <span class="text-red-500">*</span></label>
+                                <select id="lacak-select-barang" class="w-full p-4 bg-gray-50 border-0 rounded-2xl focus:ring-2 focus:ring-teal-500 outline-none text-sm shadow-sm">
+                                    <option value="">-- Pilih Ruangan Dahulu atau Cari Barang --</option>
+                                    ${assets.map(a => `<option value="${a.id}">${a.nama} (${a.merk}) - [${a.lokasi}]</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="lacak-result-container" class="hidden">
+                        <!-- Hasil Riwayat Lengkap Ditampilkan di Sini -->
+                    </div>
+                </div>
+            `;
+
+            const roomFilter = document.getElementById('lacak-filter-ruangan');
+            const assetSelect = document.getElementById('lacak-select-barang');
+            const resultContainer = document.getElementById('lacak-result-container');
+
+            roomFilter.onchange = (e) => {
+                const selectedRoom = e.target.value;
+                const filteredAssets = selectedRoom ? assets.filter(a => a.lokasi === selectedRoom) : assets;
+                
+                assetSelect.innerHTML = '<option value="">-- Pilih Nama Barang --</option>' + 
+                    filteredAssets.map(a => `<option value="${a.id}">${a.nama} (${a.merk}) - [${a.lokasi}]</option>`).join('');
+                
+                resultContainer.classList.add('hidden');
+            };
+
+            assetSelect.onchange = (e) => {
+                const assetId = e.target.value;
+                if (!assetId) {
+                    resultContainer.classList.add('hidden');
+                    return;
+                }
+                const asset = assets.find(a => a.id === assetId);
+                if (asset) {
+                    showCompleteItemTracking(asset, resultContainer);
+                }
+            };
+        };
+
+        const showCompleteItemTracking = (asset, container) => {
+            container.classList.remove('hidden');
+            const history = mutations.filter(m => m.assetId === asset.id);
+
+            container.innerHTML = `
+                <div class="card-glass rounded-[2.5rem] overflow-hidden p-8 space-y-8 shadow-xl">
+                    <div class="flex flex-col md:flex-row gap-6 items-center border-b pb-6">
+                        <div class="w-24 h-24 rounded-2xl bg-gray-100 overflow-hidden shrink-0 border">
+                            ${asset.foto ? `<img src="${asset.foto}" class="w-full h-full object-cover">` : `<div class="w-full h-full flex items-center justify-center text-gray-300 text-3xl"><i class="fas fa-image"></i></div>`}
+                        </div>
+                        <div class="flex-1 space-y-1">
+                            <span class="px-3 py-1 bg-teal-100 text-teal-800 rounded-full text-[10px] font-bold"><i class="fas fa-door-open mr-1"></i> Lokasi Saat Ini: ${asset.lokasi}</span>
+                            <h3 class="text-2xl font-bold text-gray-800 mt-1">${asset.nama}</h3>
+                            <p class="text-sm text-teal-700 font-medium">Merk/Tipe: ${asset.merk} | Kode/SN: <span class="font-mono">${asset.kode || '-'}</span></p>
+                        </div>
+                        <div class="text-right bg-teal-50 px-6 py-4 rounded-2xl border border-teal-100">
+                            <p class="text-[10px] text-teal-700 font-bold uppercase">Stok Tersedia</p>
+                            <p class="text-2xl font-bold text-teal-900">${asset.jumlah} <span class="text-xs font-normal">Unit</span></p>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <h5 class="font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-stream text-teal-600"></i> Rekam Jejak Barang (Pembelian hingga Mutasi)
+                        </h5>
+                        <div class="border rounded-2xl overflow-hidden bg-white shadow-sm">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="bg-teal-900/5 text-teal-900 border-b">
+                                        <th class="p-4 font-bold uppercase">Tanggal</th>
+                                        <th class="p-4 font-bold uppercase">Tahapan / Status</th>
+                                        <th class="p-4 font-bold uppercase">Detail Pergerakan & Keterangan</th>
+                                        <th class="p-4 font-bold uppercase text-center">Jumlah</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <tr class="hover:bg-teal-50/20">
+                                        <td class="p-4 font-semibold text-gray-600">${asset.tanggal || 'N/A'}</td>
+                                        <td class="p-4">
+                                            <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-bold text-[10px]">1. Pembelian Awal</span>
+                                        </td>
+                                        <td class="p-4 text-gray-700">
+                                            Pengadaan/Pembelian baru dari Vendor/Supplier: <b>${asset.vendor || 'Supplier Umum'}</b>. Harga Satuan: Rp ${parseInt(asset.harga || 0).toLocaleString()}
+                                        </td>
+                                        <td class="p-4 text-center font-bold text-blue-800">${asset.jumlah} Unit</td>
+                                    </tr>
+                                    ${history.length === 0 ? `
+                                        <tr>
+                                            <td colspan="4" class="p-8 text-center text-gray-400 italic">Belum ada riwayat mutasi atau perubahan status lanjutan untuk barang ini.</td>
+                                        </tr>
+                                    ` : history.map((h, index) => `
+                                        <tr class="hover:bg-teal-50/20">
+                                            <td class="p-4 font-semibold text-gray-600">${h.tanggalMutasi ? new Date(h.tanggalMutasi).toLocaleDateString('id-ID') : new Date(h.createdAt?.seconds * 1000).toLocaleDateString('id-ID')}</td>
+                                            <td class="p-4">
+                                                <span class="px-3 py-1 ${h.tipe === 'Mutasi' ? 'bg-amber-100 text-amber-700' : h.tipe === 'Rusak' ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'} rounded-full font-bold text-[10px]">
+                                                    ${index + 2}.${h.tipe}
+                                                </span>
+                                            </td>
+                                            <td class="p-4 text-gray-700">
+                                                ${h.tipe === 'Mutasi' ? `Mutasi perpindahan dari ruangan <b>${h.dari}</b> menuju ruangan <b>${h.ke}</b>.` : `Pencatatan status: <b>${h.tipe}</b> dari ${h.dari}.`}
+                                                ${h.keterangan ? `<div class="text-gray-500 text-[11px] mt-1 italic">Catatan: "${h.keterangan}"</div>` : ''}
+                                            </td>
+                                            <td class="p-4 text-center font-bold text-gray-800">${h.jumlah} Unit</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+        // --- SELESAI IMPLEMENTASI MENU LACAK BARANG ---
 
         const renderRuangan = (container) => {
             container.innerHTML = `
@@ -952,8 +1092,6 @@
             container.innerHTML = `
                 <div class="max-w-2xl mx-auto">
                     <form id="form-mutasi" class="card-glass p-8 rounded-[2rem] space-y-6">
-                        
-                        <!-- FILTER RUANGAN ASAL -->
                         <div class="space-y-2 p-4 bg-teal-50 rounded-2xl border border-teal-100">
                             <label class="text-sm font-bold text-teal-900"><i class="fas fa-filter mr-1"></i> Filter Ruangan Asal Barang</label>
                             <select id="mutasi-filter-ruangan" class="w-full p-4 bg-white border-0 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none shadow-sm">
@@ -1027,12 +1165,8 @@
                 }
             };
 
-            // Trigger populasi saat filter ruangan berubah
             filterRoom.onchange = (e) => populateAssets(e.target.value);
-            
-            // Inisialisasi daftar barang jika sedang mode edit
             if (initialRoom) populateAssets(initialRoom);
-
             if (!editData) document.getElementById('mutasi-tanggal').value = new Date().toISOString().split('T')[0];
 
             const tipeSelect = document.getElementById('mutasi-tipe');
